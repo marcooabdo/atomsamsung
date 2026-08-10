@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2, Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle, Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone, Webhook, CreditCard as Edit2, X, Columns2 as Columns, ChevronLeft, ChevronRight, Palette, GripVertical, Flag, Tag } from 'lucide-react';
+import { Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2, Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle, Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone, Webhook, CreditCard as Edit2, X, Columns2 as Columns, ChevronLeft, ChevronRight, Palette, GripVertical, Flag, Tag, Clock, Timer, Lock, ToggleLeft, ToggleRight, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useModal } from '../../contexts/ModalContext';
@@ -47,11 +47,250 @@ interface PipelineColuna {
 const DEFAULT_EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || 'https://atom-evolution-api.2vhnbz.easypanel.host';
 const DEFAULT_EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || 'Novasenha2026';
 
+function Window24hSettings({ unidadeId, accentColor }: { unidadeId: string; accentColor: string }) {
+  const [config, setConfig] = useState({
+    ping_ativo: true,
+    ping_horas: 20,
+    ping_mensagem: 'GIA - Global Intelligence Assistant:\n\nOlá! Como nosso sistema encerra conexões inativas por segurança, seu atendimento está quase sendo pausado. Se você ainda estiver aguardando alguma aprovação ou quiser tirar alguma dúvida, é só mandar um \'SIM\' ou \'Ok\' aqui para mantermos seu histórico aberto e não encerrar seu chamado!',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [conversasCriticas, setConversasCriticas] = useState<any[]>([]);
+  const [loadingReport, setLoadingReport] = useState(false);
+
+  useEffect(() => {
+    loadConfig();
+    loadConversasCriticas();
+  }, [unidadeId]);
+
+  const loadConfig = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('atom_connect_24h_config')
+      .select('*')
+      .eq('unidade_id', unidadeId)
+      .maybeSingle();
+    if (data) {
+      setConfig({
+        ping_ativo: data.ping_ativo,
+        ping_horas: data.ping_horas,
+        ping_mensagem: data.ping_mensagem,
+      });
+    }
+    setLoading(false);
+  };
+
+  const saveConfig = async () => {
+    setSaving(true);
+    const { error } = await supabase
+      .from('atom_connect_24h_config')
+      .upsert({
+        unidade_id: unidadeId,
+        ping_ativo: config.ping_ativo,
+        ping_horas: config.ping_horas,
+        ping_mensagem: config.ping_mensagem,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'unidade_id' });
+    setSaving(false);
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
+  const loadConversasCriticas = async () => {
+    setLoadingReport(true);
+    const cutoff18h = new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('atom_connect_conversas')
+      .select('id, cliente_nome, cliente_telefone, ultima_resposta_cliente_at, coluna_pipeline, ping_24h_enviado_em')
+      .eq('unidade_id', unidadeId)
+      .is('finalizado_at', null)
+      .not('ultima_resposta_cliente_at', 'is', null)
+      .lte('ultima_resposta_cliente_at', cutoff18h)
+      .order('ultima_resposta_cliente_at', { ascending: true });
+    setConversasCriticas(data || []);
+    setLoadingReport(false);
+  };
+
+  const getTimeRemaining = (lastClientAt: string) => {
+    const diff = Date.now() - new Date(lastClientAt).getTime();
+    const hoursElapsed = diff / (1000 * 60 * 60);
+    const remaining = 24 - hoursElapsed;
+    if (remaining <= 0) return { label: 'EXPIRADA', color: 'text-red-400', bg: 'bg-red-500/20' };
+    const h = Math.floor(remaining);
+    const m = Math.floor((remaining - h) * 60);
+    if (remaining <= 2) return { label: `${h}h${m}min`, color: 'text-red-400', bg: 'bg-red-500/20' };
+    if (remaining <= 4) return { label: `${h}h${m}min`, color: 'text-amber-400', bg: 'bg-amber-500/20' };
+    return { label: `${h}h${m}min`, color: 'text-yellow-400', bg: 'bg-yellow-500/20' };
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Configuration Section */}
+      <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+              <Timer className="w-5 h-5 text-black" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">Automação de Retenção (Ping 24h)</h3>
+              <p className="text-xs text-gray-400">Mensagem automática antes da janela fechar</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setConfig(prev => ({ ...prev, ping_ativo: !prev.ping_ativo }))}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors"
+            style={{ background: config.ping_ativo ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.05)' }}
+          >
+            {config.ping_ativo ? (
+              <ToggleRight className="w-5 h-5 text-emerald-400" />
+            ) : (
+              <ToggleLeft className="w-5 h-5 text-gray-500" />
+            )}
+            <span className={`text-xs font-medium ${config.ping_ativo ? 'text-emerald-400' : 'text-gray-500'}`}>
+              {config.ping_ativo ? 'Ativo' : 'Desativado'}
+            </span>
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Enviar ping após quantas horas sem resposta do cliente?
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={23}
+                value={config.ping_horas}
+                onChange={(e) => setConfig(prev => ({ ...prev, ping_horas: parseInt(e.target.value) || 20 }))}
+                className="w-24 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-white/20"
+              />
+              <span className="text-sm text-gray-400">horas (Janela fecha em 24h)</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Texto da mensagem de retenção
+            </label>
+            <textarea
+              value={config.ping_mensagem}
+              onChange={(e) => setConfig(prev => ({ ...prev, ping_mensagem: e.target.value }))}
+              rows={6}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 resize-none leading-relaxed"
+            />
+          </div>
+
+          <button
+            onClick={saveConfig}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all"
+            style={{ backgroundColor: accentColor, color: '#000' }}
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar Configurações'}
+          </button>
+        </div>
+      </div>
+
+      {/* Critical Conversations Report */}
+      <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-red-500/20">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">Relatório de Janelas Críticas</h3>
+              <p className="text-xs text-gray-400">Conversas ativas com prazo elevado (acima de 18h sem resposta do cliente)</p>
+            </div>
+          </div>
+          <button
+            onClick={loadConversasCriticas}
+            disabled={loadingReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-xs text-gray-300"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingReport ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+        </div>
+
+        <div className="divide-y divide-white/5">
+          {loadingReport ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+            </div>
+          ) : conversasCriticas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400/50" />
+              <p className="text-sm text-gray-400">Nenhuma conversa em risco no momento</p>
+            </div>
+          ) : (
+            conversasCriticas.map((c) => {
+              const time = getTimeRemaining(c.ultima_resposta_cliente_at);
+              return (
+                <div key={c.id} className="px-4 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-white truncate">{c.cliente_nome || c.cliente_telefone}</p>
+                      {c.ping_24h_enviado_em && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">Ping enviado</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-500">{c.cliente_telefone}</span>
+                      {c.coluna_pipeline && (
+                        <span className="text-[10px] text-gray-600">• {c.coluna_pipeline}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 ml-3">
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${time.color} ${time.bg}`}>
+                      {time.label === 'EXPIRADA' ? (
+                        <span className="flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> EXPIRADA
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Timer className="w-3 h-3" /> {time.label}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {conversasCriticas.length > 0 && (
+          <div className="px-4 py-2.5 border-t border-white/5 text-xs text-gray-500 text-center">
+            {conversasCriticas.length} conversa{conversasCriticas.length !== 1 ? 's' : ''} em risco
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const { unidadeAtual, unidades } = useAuth();
   const { showAlert, showConfirm } = useModal();
   const effectiveUnidadeId = unidadeId || unidadeAtual;
-  const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline' | 'finalization' | 'tags'>('instances');
+  const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline' | 'finalization' | 'tags' | '24h_window'>('instances');
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [respostasRapidas, setRespostasRapidas] = useState<RespostaRapida[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +301,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const [qrCodeModal, setQrCodeModal] = useState<{ instancia: Instancia; qrCode: string } | null>(null);
   const qrPollingRef = useRef<NodeJS.Timeout | null>(null);
   const [editingInstance, setEditingInstance] = useState<Instancia | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', observacao: '', phone_number: '', phone_number_id: '' });
+  const [editForm, setEditForm] = useState({ nome: '', observacao: '', phone_number: '', phone_number_id: '', wa_business_token: '', wa_business_account_id: '' });
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [newInstance, setNewInstance] = useState({
@@ -453,7 +692,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       nome: instancia.nome,
       observacao: instancia.observacao || '',
       phone_number: instancia.phone_number || '',
-      phone_number_id: instancia.phone_number_id || ''
+      phone_number_id: instancia.phone_number_id || '',
+      wa_business_token: instancia.wa_business_token || '',
+      wa_business_account_id: instancia.wa_business_account_id || '',
     });
     setEditingInstance(instancia);
   };
@@ -477,7 +718,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         nome: editForm.nome.trim(),
         observacao: editForm.observacao.trim() || null,
         phone_number: editForm.phone_number.trim() || null,
-        phone_number_id: editForm.phone_number_id.trim() || null
+        phone_number_id: editForm.phone_number_id.trim() || null,
+        wa_business_token: editForm.wa_business_token.trim() || null,
+        wa_business_account_id: editForm.wa_business_account_id.trim() || null,
       })
       .eq('id', editingInstance.id);
 
@@ -1010,6 +1253,20 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
               Finalizacao
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('24h_window')}
+            className={`py-3 border-b-2 text-sm font-medium transition-colors ${
+              activeTab === '24h_window'
+                ? 'border-current text-white'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+            style={{ borderColor: activeTab === '24h_window' ? accentColor : undefined }}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Janela 24h
+            </div>
+          </button>
         </div>
       </div>
 
@@ -1459,6 +1716,18 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
             <Flag className="w-16 h-16 mb-4 opacity-50" />
             <p className="text-lg">Selecione uma unidade</p>
             <p className="text-sm mt-2">Para configurar regras de finalizacao, selecione uma unidade primeiro</p>
+          </div>
+        )}
+
+        {activeTab === '24h_window' && effectiveUnidadeId && (
+          <Window24hSettings unidadeId={effectiveUnidadeId} accentColor={accentColor} />
+        )}
+
+        {activeTab === '24h_window' && !effectiveUnidadeId && (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+            <Clock className="w-16 h-16 mb-4 opacity-50" />
+            <p className="text-lg">Selecione uma unidade</p>
+            <p className="text-sm mt-2">Para configurar a janela de 24h, selecione uma unidade primeiro</p>
           </div>
         )}
       </div>
@@ -1984,6 +2253,30 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                     value={editForm.phone_number_id}
                     onChange={(e) => setEditForm(prev => ({ ...prev, phone_number_id: e.target.value }))}
                     placeholder="Ex: 1286267577901515"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Meta Business Token (WhatsApp Cloud API)
+                  </label>
+                  <input
+                    type="password"
+                    value={editForm.wa_business_token}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, wa_business_token: e.target.value }))}
+                    placeholder="EAAdSU5O..."
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Business Account ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.wa_business_account_id}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, wa_business_account_id: e.target.value }))}
+                    placeholder="Ex: 1522723482394635"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                   />
                 </div>

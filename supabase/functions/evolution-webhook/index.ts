@@ -252,7 +252,8 @@ Deno.serve(async (req: Request) => {
           else if (rawStatus >= 4) newStatus = "read";
         } else if (typeof rawStatus === "string") {
           const upper = rawStatus.toUpperCase();
-          if (upper === "PENDING" || upper === "ERROR" || upper === "0" || upper === "1") newStatus = "pending";
+          if (upper === "PENDING" || upper === "0" || upper === "1") newStatus = "pending";
+          else if (upper === "ERROR" || upper === "FAILED") newStatus = "failed";
           else if (upper === "SERVER_ACK" || upper === "SENT" || upper === "2") newStatus = "sent";
           else if (upper === "DELIVERY_ACK" || upper === "DELIVERED" || upper === "3") newStatus = "delivered";
           else if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED" || upper === "4" || upper === "5") newStatus = "read";
@@ -262,10 +263,14 @@ Deno.serve(async (req: Request) => {
           .from("atom_connect_mensagens")
           .update({ status: newStatus })
           .eq("message_id", messageId)
-          .select("id");
+          .select("id, conversa_id");
 
-        if (error) {
-          // ignored
+        // When a message fails, force the 24h window closed on the conversation
+        if (!error && result && result.length > 0 && newStatus === "failed") {
+          await supabase
+            .from("atom_connect_conversas")
+            .update({ janela_fechada_forcada: true })
+            .eq("id", result[0].conversa_id);
         }
       }
 
@@ -988,6 +993,8 @@ async function processMessage(
     if (!fromMe) {
       updateData.ultima_resposta_cliente_at = new Date().toISOString();
       updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
+      updateData.janela_fechada_forcada = false;
+      updateData.ping_24h_enviado_em = null;
 
       if (!groupInfo.isGroup) {
         const { data: currentColumn } = await supabase

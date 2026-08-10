@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight, ShieldAlert } from 'lucide-react';
+import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight, ShieldAlert, Lock, Timer, FileCode2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -35,6 +35,8 @@ interface Conversa {
   is_interno?: boolean;
   nps_score?: number | null;
   nps_comentario?: string | null;
+  janela_fechada_forcada?: boolean;
+  ping_24h_enviado_em?: string | null;
   created_at: string;
 }
 
@@ -92,6 +94,20 @@ interface Instancia {
   api_url: string;
   api_key: string;
   instance_name: string;
+}
+
+interface MetaTemplate {
+  name: string;
+  status: string;
+  language: string;
+  category: string;
+  components: Array<{
+    type: string;
+    text?: string;
+    format?: string;
+    buttons?: Array<{ type: string; text: string; url?: string; phone_number?: string }>;
+    example?: any;
+  }>;
 }
 
 const EMOJI_LIST = [
@@ -169,6 +185,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [showGroupMembers, setShowGroupMembers] = useState(false);
   const [groupMembers, setGroupMembers] = useState<{ phone: string; name: string | null; role: string; foto_url: string | null }[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [metaTemplates, setMetaTemplates] = useState<MetaTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [sendingTemplate, setSendingTemplate] = useState<string | null>(null);
+  const [janelaForcadaFechada, setJanelaForcadaFechada] = useState(conversa.janela_fechada_forcada || false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -525,6 +546,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as Mensagem;
             setMensagens(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+            if (updatedMsg.status === 'failed' && updatedMsg.from_me) {
+              setJanelaForcadaFechada(true);
+            }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
             setMensagens(prev => prev.filter(m => m.id !== deletedId));
@@ -1483,7 +1507,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           </svg>
         );
       case 'failed':
-        return <AlertTriangle className="w-3 h-3 text-red-400" />;
+        return (
+          <span className="flex items-center gap-0.5">
+            <AlertTriangle className="w-3 h-3 text-red-400" />
+            <span className="text-[9px] text-red-400 font-medium">Erro</span>
+          </span>
+        );
       default:
         return null;
     }
@@ -1495,7 +1524,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       case 'sent': return 'Enviada';
       case 'delivered': return 'Entregue';
       case 'read': return 'Visualizada';
-      case 'failed': return 'Falhou';
+      case 'failed': return 'Erro: Janela Expirada';
       default: return '';
     }
   };
@@ -1537,6 +1566,80 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     if (hours < 24) return `${hours}h atr\u00e1s`;
     if (days < 7) return `${days}d atr\u00e1s`;
     return date.toLocaleDateString('pt-BR');
+  };
+
+  const get24hWindowInfo = () => {
+    const lastClientMsg = conversa.ultima_resposta_cliente_at;
+    if (!lastClientMsg) return { isOpen: false, remaining: 0, label: 'Sem historico' };
+    const diff = Date.now() - new Date(lastClientMsg).getTime();
+    const hoursElapsed = diff / (1000 * 60 * 60);
+    const remaining = 24 - hoursElapsed;
+    if (remaining <= 0 || janelaForcadaFechada) {
+      return { isOpen: false, remaining: 0, label: 'Janela fechada' };
+    }
+    const h = Math.floor(remaining);
+    const m = Math.floor((remaining - h) * 60);
+    return { isOpen: true, remaining, label: `${h}h${m > 0 ? `${m}min` : ''} restantes` };
+  };
+
+  const windowInfo = get24hWindowInfo();
+
+  const loadMetaTemplates = async () => {
+    if (!instancia) return;
+    setLoadingTemplates(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-meta-templates?instancia_id=${instancia.id}`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMetaTemplates(data.templates || []);
+      }
+    } catch { /* ignore */ }
+    setLoadingTemplates(false);
+  };
+
+  const sendMetaTemplate = async (template: MetaTemplate) => {
+    if (!instancia || !conversa.cliente_telefone) return;
+    setSendingTemplate(template.name);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-meta-templates`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instancia_id: instancia.id,
+            template_name: template.name,
+            language: template.language,
+            phone_number: conversa.cliente_telefone,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const bodyComp = template.components.find((c: any) => c.type === 'BODY');
+        const templateText = bodyComp?.text || `[Template: ${template.name}]`;
+        await supabase.from('atom_connect_mensagens').insert({
+          conversa_id: conversa.id,
+          message_id: data.messageId || `template_${Date.now()}`,
+          from_me: true,
+          tipo: 'text',
+          conteudo: templateText,
+          status: 'sent',
+          is_bot: false,
+          enviado_por: usuario?.id || null,
+          metadata: { template_name: template.name, template_language: template.language },
+        });
+        await supabase.from('atom_connect_conversas').update({
+          ultima_mensagem: templateText.substring(0, 200),
+          ultima_mensagem_at: new Date().toISOString(),
+        }).eq('id', conversa.id);
+        setShowTemplateModal(false);
+      }
+    } catch { /* ignore */ }
+    setSendingTemplate(null);
   };
 
   const getFileIcon = (mimetype: string) => {
@@ -2316,8 +2419,39 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         </AnimatePresence>
 
         {/* Input */}
-        <div className="flex-shrink-0 p-3" style={{ borderTop: replyTo ? 'none' : `1px solid ${borderColor}`, background: inputFooterBg }}>
-          {isRecording ? (
+        {/* 24h Window Status Bar */}
+        {!conversa.is_group && (
+          <div className="flex-shrink-0 px-3 py-1.5 flex items-center justify-between text-xs" style={{ borderTop: `1px solid ${borderColor}`, background: inputFooterBg }}>
+            <div className="flex items-center gap-1.5">
+              {windowInfo.isOpen ? (
+                <>
+                  <Timer className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400 font-medium">Janela aberta</span>
+                  <span className="text-gray-500">- {windowInfo.label}</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3 h-3 text-amber-400" />
+                  <span className="text-amber-400 font-medium">Janela 24h fechada</span>
+                  <span className="text-gray-500">- Apenas templates permitidos</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Input Area */}
+        <div className="flex-shrink-0 p-3" style={{ borderTop: `1px solid ${borderColor}`, background: inputFooterBg }}>
+          {!conversa.is_group && !windowInfo.isOpen ? (
+            <button
+              onClick={() => { setShowTemplateModal(true); loadMetaTemplates(); }}
+              className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl font-semibold text-sm transition-all hover:scale-[1.01]"
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000' }}
+            >
+              <Lock className="w-5 h-5" />
+              Janela Fechada - Escolher Template
+            </button>
+          ) : isRecording ? (
             <div className="flex items-center gap-3">
               <button
                 onClick={cancelRecording}
@@ -3086,6 +3220,113 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             {previewMedia.type === 'image' && (
               <img src={previewMedia.url} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Template Picker Modal */}
+      <AnimatePresence>
+        {showTemplateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setShowTemplateModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg max-h-[80vh] rounded-2xl overflow-hidden flex flex-col"
+              style={{ background: isDark ? '#1a1a2e' : '#ffffff', border: `1px solid ${borderColor}` }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4" style={{ borderBottom: `1px solid ${borderColor}` }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                    <FileCode2 className="w-4 h-4 text-black" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold" style={{ color: textPrimary }}>Templates Aprovados</h3>
+                    <p className="text-xs" style={{ color: textSecondary }}>Selecione um template para reabrir a conversa</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowTemplateModal(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                  <X className="w-4 h-4" style={{ color: textSecondary }} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {loadingTemplates ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: accentColor }} />
+                    <p className="text-sm" style={{ color: textSecondary }}>Buscando templates da Meta...</p>
+                  </div>
+                ) : metaTemplates.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <AlertTriangle className="w-10 h-10 text-amber-400" />
+                    <p className="text-sm font-medium" style={{ color: textPrimary }}>Nenhum template aprovado</p>
+                    <p className="text-xs text-center" style={{ color: textSecondary }}>
+                      Configure o Token da Meta e o Business Account ID nas configuracoes da instancia, ou aprove templates no Meta Business Manager.
+                    </p>
+                  </div>
+                ) : (
+                  metaTemplates.map((template) => {
+                    const bodyComp = template.components.find((c) => c.type === 'BODY');
+                    const headerComp = template.components.find((c) => c.type === 'HEADER');
+                    const buttonsComp = template.components.find((c) => c.type === 'BUTTONS');
+                    const isSending = sendingTemplate === template.name;
+
+                    return (
+                      <button
+                        key={`${template.name}-${template.language}`}
+                        onClick={() => sendMetaTemplate(template)}
+                        disabled={isSending}
+                        className="w-full text-left p-4 rounded-xl border transition-all hover:scale-[1.01]"
+                        style={{
+                          background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                          borderColor: isSending ? accentColor : borderColor,
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold" style={{ color: textPrimary }}>{template.name.replace(/_/g, ' ')}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">
+                                {template.category}
+                              </span>
+                              <span className="text-[10px]" style={{ color: textSecondary }}>{template.language}</span>
+                            </div>
+                          </div>
+                          {isSending ? (
+                            <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" style={{ color: accentColor }} />
+                          ) : (
+                            <Send className="w-4 h-4 flex-shrink-0" style={{ color: accentColor }} />
+                          )}
+                        </div>
+                        {headerComp?.text && (
+                          <p className="text-xs font-medium mb-1" style={{ color: textPrimary }}>{headerComp.text}</p>
+                        )}
+                        {bodyComp?.text && (
+                          <p className="text-xs leading-relaxed line-clamp-4" style={{ color: textSecondary }}>{bodyComp.text}</p>
+                        )}
+                        {buttonsComp?.buttons && buttonsComp.buttons.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {buttonsComp.buttons.map((btn, i) => (
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor, color: accentColor }}>
+                                {btn.text}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
