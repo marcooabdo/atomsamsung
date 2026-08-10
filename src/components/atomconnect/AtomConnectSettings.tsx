@@ -102,6 +102,7 @@ function Window24hSettings({ unidadeId, accentColor }: { unidadeId: string; acce
   const loadConversasCriticas = async () => {
     setLoadingReport(true);
     const cutoff18h = new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString();
+    const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data } = await supabase
       .from('atom_connect_conversas')
       .select('id, cliente_nome, cliente_telefone, ultima_resposta_cliente_at, coluna_pipeline, ping_24h_enviado_em')
@@ -109,6 +110,7 @@ function Window24hSettings({ unidadeId, accentColor }: { unidadeId: string; acce
       .is('finalizado_at', null)
       .not('ultima_resposta_cliente_at', 'is', null)
       .lte('ultima_resposta_cliente_at', cutoff18h)
+      .gte('ultima_resposta_cliente_at', cutoff24h)
       .order('ultima_resposta_cliente_at', { ascending: true });
     setConversasCriticas(data || []);
     setLoadingReport(false);
@@ -118,7 +120,7 @@ function Window24hSettings({ unidadeId, accentColor }: { unidadeId: string; acce
     const diff = Date.now() - new Date(lastClientAt).getTime();
     const hoursElapsed = diff / (1000 * 60 * 60);
     const remaining = 24 - hoursElapsed;
-    if (remaining <= 0) return { label: 'EXPIRADA', color: 'text-red-400', bg: 'bg-red-500/20' };
+    if (remaining <= 0) return null;
     const h = Math.floor(remaining);
     const m = Math.floor((remaining - h) * 60);
     if (remaining <= 2) return { label: `${h}h${m}min`, color: 'text-red-400', bg: 'bg-red-500/20' };
@@ -257,19 +259,15 @@ function Window24hSettings({ unidadeId, accentColor }: { unidadeId: string; acce
                       )}
                     </div>
                   </div>
-                  <div className="flex-shrink-0 ml-3">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${time.color} ${time.bg}`}>
-                      {time.label === 'EXPIRADA' ? (
-                        <span className="flex items-center gap-1">
-                          <Lock className="w-3 h-3" /> EXPIRADA
-                        </span>
-                      ) : (
+                  {time && (
+                    <div className="flex-shrink-0 ml-3">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${time.color} ${time.bg}`}>
                         <span className="flex items-center gap-1">
                           <Timer className="w-3 h-3" /> {time.label}
                         </span>
-                      )}
-                    </span>
-                  </div>
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })
