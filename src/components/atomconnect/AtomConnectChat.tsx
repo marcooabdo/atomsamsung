@@ -1605,7 +1605,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     setSendingTemplate(template.name);
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-meta-templates`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-meta-templates/send`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1637,8 +1637,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           ultima_mensagem_at: new Date().toISOString(),
         }).eq('id', conversa.id);
         setShowTemplateModal(false);
+      } else {
+        console.error('Template send failed:', data);
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('Template send error:', err);
+    }
     setSendingTemplate(null);
   };
 
