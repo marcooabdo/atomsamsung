@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Brain, Plus, Save, Trash2, Loader2, ToggleLeft, ToggleRight, Search, ChevronDown, ChevronUp, Sparkles, MessageSquare, ArrowRight, Clock, Filter, X, BookOpen, Zap, MonitorSpeaker } from 'lucide-react';
 import { GIADashboard } from './GIADashboard';
 import { supabase } from '../../lib/supabase';
@@ -309,10 +309,10 @@ function ConhecimentoTab({ accentColor, unidadeId, usuarioId, accessibleUnits, i
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="rounded-2xl overflow-hidden"
+            className="rounded-2xl"
             style={{ background: 'var(--bg-card)', border: `1px solid ${accentColor}40` }}
           >
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-visible">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   {editingId ? 'Editar Ensinamento' : 'Novo Ensinamento'}
@@ -809,12 +809,22 @@ function UnidadeSelector({ unidades, selected, onChange, accentColor, compact }:
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0 });
   const isAll = selected === null;
   const sz = compact ? 'text-[10px]' : 'text-xs';
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+  }, [open]);
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className={`w-full flex items-center gap-2 px-3 ${compact ? 'py-1.5' : 'py-2.5'} rounded-xl ${sz} text-left`}
         style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
@@ -827,10 +837,10 @@ function UnidadeSelector({ unidades, selected, onChange, accentColor, compact }:
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setOpen(false)} />
           <div
-            className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl max-h-48 overflow-auto shadow-xl"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
+            className="fixed rounded-xl max-h-48 overflow-auto shadow-2xl"
+            style={{ zIndex: 9999, top: dropPos.top, left: dropPos.left, width: dropPos.width, background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
           >
             <button
               onClick={() => { onChange(null); setOpen(false); }}
