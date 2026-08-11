@@ -413,6 +413,7 @@ async function sendWhatsAppMessage(supabase: any, conversa: any, text: string): 
     conteudo: text,
     status: "sent",
     is_bot: true,
+    sender_name: "GIA",
   });
 
   await supabase

@@ -2074,9 +2074,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     }}
                   >
                     {msg.is_bot && (
-                      <div className="flex items-center gap-1 text-[10px] text-purple-400 mb-1">
-                        <Bot className="w-3 h-3" />
-                        {msg.sender_name || 'GIA'}
+                      <div className="flex items-center gap-1 mb-1">
+                        <Bot className="w-3 h-3" style={{ color: isDark ? '#a78bfa' : '#7c3aed' }} />
+                        <span className="text-[11px] font-semibold" style={{ color: isDark ? '#a78bfa' : '#7c3aed' }}>
+                          {msg.sender_name || 'GIA'}:
+                        </span>
                       </div>
                     )}
 
