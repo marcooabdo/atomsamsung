@@ -146,7 +146,12 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (linkData) {
-        const appUrl = Deno.env.get("APP_URL") || supabaseUrl.replace(".supabase.co", ".netlify.app");
+        const { data: appUrlSecret } = await supabase
+          .from("system_secrets")
+          .select("value")
+          .eq("key", "APP_URL")
+          .maybeSingle();
+        const appUrl = appUrlSecret?.value || Deno.env.get("APP_URL") || supabaseUrl.replace("supabase.co", "netlify.app").replace("/rest/v1", "");
         orcamentoLink = `${appUrl}/orcamento/${linkData.token}`;
       }
     }

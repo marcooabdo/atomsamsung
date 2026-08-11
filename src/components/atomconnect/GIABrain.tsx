@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Brain, Plus, Save, Trash2, Loader2, ToggleLeft, ToggleRight, Search, ChevronDown, ChevronUp, Sparkles, MessageSquare, ArrowRight, Clock, Filter, X, BookOpen, Zap } from 'lucide-react';
+import { Brain, Plus, Save, Trash2, Loader2, ToggleLeft, ToggleRight, Search, ChevronDown, ChevronUp, Sparkles, MessageSquare, ArrowRight, Clock, Filter, X, BookOpen, Zap, MonitorSpeaker } from 'lucide-react';
+import { GIADashboard } from './GIADashboard';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -84,9 +85,10 @@ const COLUNAS_PIPELINE = [
 
 export function GIABrain({ accentColor, unidadeId }: Props) {
   const { usuario } = useAuth();
-  const [activeTab, setActiveTab] = useState<'conhecimento' | 'pipeline'>('conhecimento');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'conhecimento' | 'pipeline'>('dashboard');
 
   const tabs = [
+    { id: 'dashboard' as const, label: 'Dashboard', icon: MonitorSpeaker },
     { id: 'conhecimento' as const, label: 'Base de Conhecimento', icon: BookOpen },
     { id: 'pipeline' as const, label: 'Mensagens Pipeline', icon: MessageSquare },
   ];
@@ -126,6 +128,9 @@ export function GIABrain({ accentColor, unidadeId }: Props) {
       </div>
 
       <div className="flex-1 overflow-auto">
+        {activeTab === 'dashboard' && (
+          <GIADashboard accentColor={accentColor} unidadeId={unidadeId} />
+        )}
         {activeTab === 'conhecimento' && (
           <ConhecimentoTab accentColor={accentColor} unidadeId={unidadeId} usuarioId={usuario?.id} />
         )}
@@ -826,3 +831,6 @@ function UnidadeSelector({ unidades, selected, onChange, accentColor, compact }:
     </div>
   );
 }
+
+
+export { GIABrain }
