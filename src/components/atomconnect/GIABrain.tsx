@@ -158,17 +158,17 @@ export function GIABrain({ accentColor, unidadeId }: Props) {
           <GIADashboard accentColor={accentColor} unidadeId={selectedUnit} />
         )}
         {activeTab === 'conhecimento' && (
-          <ConhecimentoTab accentColor={accentColor} unidadeId={selectedUnit} usuarioId={usuario?.id} />
+          <ConhecimentoTab accentColor={accentColor} unidadeId={selectedUnit} usuarioId={usuario?.id} accessibleUnits={accessibleUnits} isMasterDiretoria={isMasterDiretoria} />
         )}
         {activeTab === 'pipeline' && (
-          <PipelineMensagensTab accentColor={accentColor} unidadeId={selectedUnit} usuarioId={usuario?.id} />
+          <PipelineMensagensTab accentColor={accentColor} unidadeId={selectedUnit} usuarioId={usuario?.id} accessibleUnits={accessibleUnits} isMasterDiretoria={isMasterDiretoria} />
         )}
       </div>
     </div>
   );
 }
 
-function ConhecimentoTab({ accentColor, unidadeId, usuarioId }: { accentColor: string; unidadeId?: string; usuarioId?: string }) {
+function ConhecimentoTab({ accentColor, unidadeId, usuarioId, accessibleUnits, isMasterDiretoria }: { accentColor: string; unidadeId?: string; usuarioId?: string; accessibleUnits: Unidade[]; isMasterDiretoria: boolean }) {
   const [items, setItems] = useState<Conhecimento[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,7 +176,8 @@ function ConhecimentoTab({ accentColor, unidadeId, usuarioId }: { accentColor: s
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [unidades, setUnidades] = useState<Unidade[]>([]);
+  const [allUnidades, setAllUnidades] = useState<Unidade[]>([]);
+  const unidades = isMasterDiretoria ? allUnidades : (accessibleUnits.length > 0 ? accessibleUnits : allUnidades);
   const [form, setForm] = useState({
     titulo: '',
     conteudo: '',
@@ -187,12 +188,12 @@ function ConhecimentoTab({ accentColor, unidadeId, usuarioId }: { accentColor: s
 
   useEffect(() => {
     loadData();
-    loadUnidades();
+    loadAllUnidades();
   }, []);
 
-  const loadUnidades = async () => {
+  const loadAllUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
-    if (data) setUnidades(data);
+    if (data) setAllUnidades(data);
   };
 
   const loadData = async () => {
@@ -476,13 +477,14 @@ function ConhecimentoTab({ accentColor, unidadeId, usuarioId }: { accentColor: s
   );
 }
 
-function PipelineMensagensTab({ accentColor, unidadeId, usuarioId }: { accentColor: string; unidadeId?: string; usuarioId?: string }) {
+function PipelineMensagensTab({ accentColor, unidadeId, usuarioId, accessibleUnits, isMasterDiretoria }: { accentColor: string; unidadeId?: string; usuarioId?: string; accessibleUnits: Unidade[]; isMasterDiretoria: boolean }) {
   const [mensagens, setMensagens] = useState<PipelineMensagem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedColumn, setExpandedColumn] = useState<string | null>(null);
   const [editingMsg, setEditingMsg] = useState<PipelineMensagem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [unidades, setUnidades] = useState<Unidade[]>([]);
+  const [allUnidades, setAllUnidades] = useState<Unidade[]>([]);
+  const unidades = isMasterDiretoria ? allUnidades : (accessibleUnits.length > 0 ? accessibleUnits : allUnidades);
   const [showNewFor, setShowNewFor] = useState<string | null>(null);
   const [newForm, setNewForm] = useState({
     tipo_atendimento: 'todos',
@@ -494,12 +496,12 @@ function PipelineMensagensTab({ accentColor, unidadeId, usuarioId }: { accentCol
 
   useEffect(() => {
     loadData();
-    loadUnidades();
+    loadAllUnidades();
   }, []);
 
-  const loadUnidades = async () => {
+  const loadAllUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
-    if (data) setUnidades(data);
+    if (data) setAllUnidades(data);
   };
 
   const loadData = async () => {
