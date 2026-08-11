@@ -100,51 +100,45 @@ Deno.serve(async (req: Request) => {
     const history = (historyResult.data || []).reverse();
 
     async function loadOSDetails(osId: string) {
-      const { data, error } = await supabase.from("os").select(OS_DETAIL_SELECT).eq("id", osId).maybeSingle();
+      const { data: rows, error } = await supabase.from("os").select(OS_DETAIL_SELECT).eq("id", osId).limit(1);
       if (error) console.error("loadOSDetails error:", error.message);
-      return data;
-    }
-
-    async function findOSById(osId: string) {
-      const { data } = await supabase.from("os").select("id").eq("id", osId).maybeSingle();
-      return data?.id || null;
+      return rows && rows.length > 0 ? rows[0] : null;
     }
 
     async function findOSByPhone(phone: string) {
       const suffix = phone.replace(/\D/g, "");
       const phoneSuffix = suffix.length >= 10 ? suffix.slice(-10) : suffix;
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from("os")
         .select("id")
         .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
         .neq("arquivada", true)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
       if (error) console.error("findOSByPhone error:", error.message);
-      return data?.id || null;
+      return rows && rows.length > 0 ? rows[0].id : null;
     }
 
     async function findOSByNumber(candidate: string) {
-      // Search samsung number first (exact match)
-      const { data: bySamsung, error: e1 } = await supabase
+      // Search samsung number first (exact match) — use array select to avoid maybeSingle 406 issues
+      const { data: samsungRows, error: e1 } = await supabase
         .from("os")
         .select("id")
         .eq("numero_os_samsung", candidate)
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
       if (e1) console.error("findOSByNumber samsung error:", e1.message, candidate);
-      if (bySamsung?.id) return bySamsung.id;
+      if (samsungRows && samsungRows.length > 0) return samsungRows[0].id;
 
       // Fallback: search internal number (case-insensitive)
-      const { data: byInterna, error: e2 } = await supabase
+      const { data: internaRows, error: e2 } = await supabase
         .from("os")
         .select("id")
         .ilike("numero_os_interna", candidate)
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
       if (e2) console.error("findOSByNumber interna error:", e2.message, candidate);
-      return byInterna?.id || null;
+      if (internaRows && internaRows.length > 0) return internaRows[0].id;
+
+      return null;
     }
 
     let osVinculada: any = null;
@@ -202,7 +196,29 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const systemPrompt = buildSystemPrompt(conversa, osVinculada, unitKnowledge, orcamentoLink);
+    // Load pipeline messages for the OS status
+    let pipelineMensagem = "";
+    if (osVinculada?.coluna_kanban) {
+      const { data: pipelineMsgs } = await supabase
+        .from("gia_pipeline_mensagens")
+        .select("mensagem, tipo_atendimento, tipo_os")
+        .eq("coluna_kanban", osVinculada.coluna_kanban)
+        .eq("ativo", true);
+      if (pipelineMsgs && pipelineMsgs.length > 0) {
+        // Filter by tipo_atendimento and tipo_os if they match the OS
+        const osTA = (osVinculada.tipo_atendimento || "").toLowerCase();
+        const osTO = (osVinculada.tipo_os || "").toLowerCase();
+        const matching = pipelineMsgs.filter((m: any) => {
+          const ta = (m.tipo_atendimento || "todos").toLowerCase();
+          const to = (m.tipo_os || "todos").toLowerCase();
+          return (ta === "todos" || ta === osTA) && (to === "todos" || to === osTO);
+        });
+        const chosen = matching.length > 0 ? matching : pipelineMsgs;
+        pipelineMensagem = chosen.map((m: any) => m.mensagem).join("\n");
+      }
+    }
+
+    const systemPrompt = buildSystemPrompt(conversa, osVinculada, unitKnowledge, orcamentoLink, pipelineMensagem);
 
     const messages: Array<{ role: string; content: string }> = [
       { role: "system", content: systemPrompt },
@@ -323,7 +339,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string): string {
+function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string): string {
   const nomeCliente = conversa.cliente_nome || "Cliente";
 
   let prompt = `Você é a GIA (Global Intelligence Assistant), assistente virtual de atendimento ao cliente de uma assistência técnica autorizada Samsung.
@@ -363,13 +379,26 @@ SOBRE O CLIENTE ATUAL:
       aguardando_peca: "Aguardando peça para reparo",
       peca_em_transito: "Peça a caminho",
       em_reparo_ci: "Em reparo na assistência",
-      em_rota_ih: "Visita agendada",
-      em_reparo_ih: "Reparo em andamento (visita)",
+      rota_preta: "Em programação de rota",
+      rota_vermelha: "Em programação de rota",
+      rota_azul: "Em programação de rota",
+      rota_verde: "Em programação de rota",
+      rota_rosa: "Em programação de rota",
+      rota_amarela: "Em programação de rota",
+      rota_laranja: "Em programação de rota",
+      em_rota_ih: "Visita técnica agendada",
+      em_reparo_ih: "Reparo em andamento no local",
+      instalacao_inicial: "Em instalação inicial",
+      service_handling: "Em tratativa de serviço",
+      return_handling: "Em tratativa de devolução",
+      trade_up: "Em processo de Trade Up",
+      saw: "Em processo SAW",
+      controle_qualidade: "Em controle de qualidade",
+      qa_bt: "Em controle de qualidade",
       reparo_concluido: "Reparo concluído",
       aguardando_fechamento: "Aguardando fechamento",
       os_fechada: "Serviço finalizado",
       orcamentos_rejeitados: "Orçamento recusado",
-      controle_qualidade: "Em controle de qualidade",
     };
     const statusDesc = statusMap[os.coluna_kanban] || os.coluna_kanban;
 
@@ -410,6 +439,12 @@ ORDEM DE SERVIÇO VINCULADA:
       for (const p of os.pagamentos) {
         prompt += `- ${p.forma_pagamento}: R$ ${(p.valor || 0).toFixed(2)} em ${new Date(p.created_at).toLocaleDateString("pt-BR")}\n`;
       }
+    }
+
+    if (pipelineMensagem) {
+      prompt += `\nMENSAGEM PADRÃO PARA ESTE STATUS (use como base da sua resposta ao informar o status ao cliente, adapte naturalmente):
+${pipelineMensagem}
+`;
     }
 
     if (orcamentoLink) {
