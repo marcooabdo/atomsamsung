@@ -551,7 +551,25 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     return cleanPhone;
   };
 
-  const checkWhatsAppNumber = async (phone: string, apiUrl: string, apiKey: string, instanceName: string): Promise<boolean> => {
+  const getPhoneVariants = (phone: string): string[] => {
+    const digits = phone.replace(/\D/g, '');
+    const withCountry = digits.startsWith('55') ? digits : '55' + digits;
+    const local = withCountry.slice(2);
+    const ddd = local.slice(0, 2);
+    const number = local.slice(2);
+    const variants = new Set<string>();
+    variants.add(withCountry);
+    if (number.length === 9 && number.startsWith('9')) {
+      variants.add('55' + ddd + number.slice(1));
+    }
+    if (number.length === 8) {
+      variants.add('55' + ddd + '9' + number);
+    }
+    return [...variants];
+  };
+
+  const checkWhatsAppNumber = async (phone: string, apiUrl: string, apiKey: string, instanceName: string): Promise<string | false> => {
+    const variants = getPhoneVariants(phone);
     try {
       const response = await fetch(`${apiUrl}/chat/whatsappNumbers/${instanceName}`, {
         method: 'POST',
@@ -559,13 +577,14 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
           'Content-Type': 'application/json',
           'apikey': apiKey
         },
-        body: JSON.stringify({ numbers: [phone] })
+        body: JSON.stringify({ numbers: variants })
       });
 
       if (!response.ok) return false;
       const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return data[0].exists === true || !!data[0].jid;
+      if (Array.isArray(data)) {
+        const found = data.find((d: any) => d.exists === true || !!d.jid);
+        if (found) return found.jid?.split('@')[0] || variants[0];
       }
       return false;
     } catch (error) {
@@ -586,15 +605,19 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     setWhatsAppError(null);
 
     try {
-      const phoneDigits = formattedPhone.replace(/\D/g, '');
-      const phoneWithout55 = phoneDigits.startsWith('55') ? phoneDigits.slice(2) : phoneDigits;
-      const last8 = phoneDigits.slice(-8);
+      const variants = getPhoneVariants(formattedPhone);
+      const last8 = formattedPhone.replace(/\D/g, '').slice(-8);
+
+      const orFilters = [
+        `cliente_telefone.like.%${last8}`,
+        ...variants.map(v => `cliente_telefone.eq.${v}`),
+      ].join(',');
 
       const { data: matchingConversas } = await supabase
         .from('atom_connect_conversas')
         .select('*')
         .eq('unidade_id', os.unidade_id)
-        .or(`cliente_telefone.like.%${last8},cliente_telefone.like.%${phoneWithout55}%,cliente_telefone.eq.${formattedPhone}`)
+        .or(orFilters)
         .order('ultima_mensagem_at', { ascending: false });
 
       const existingConversa = matchingConversas?.[0] || null;
@@ -626,14 +649,14 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         return;
       }
 
-      const hasWhatsApp = await checkWhatsAppNumber(
+      const confirmedPhone = await checkWhatsAppNumber(
         formattedPhone,
         instancia.api_url,
         instancia.api_key,
         instancia.instance_name
       );
 
-      if (!hasWhatsApp) {
+      if (!confirmedPhone) {
         setWhatsAppError('Este numero nao possui WhatsApp');
         setLoadingWhatsApp(false);
         return;
@@ -655,7 +678,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         .from('atom_connect_conversas')
         .insert({
           unidade_id: os.unidade_id,
-          cliente_telefone: formattedPhone,
+          cliente_telefone: confirmedPhone,
           cliente_nome: os.cliente_nome || null,
           os_id: os.id,
           coluna_pipeline: firstColumn?.id || 'bot_triagem',
