@@ -833,4 +833,3 @@ function UnidadeSelector({ unidades, selected, onChange, accentColor, compact }:
 }
 
 
-export { GIABrain }

@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: conversa } = await supabase
       .from("atom_connect_conversas")
-      .select("id, instancia:atom_connect_instancias(*)")
+      .select("id, ultima_resposta_cliente_at, instancia:atom_connect_instancias(*)")
       .ilike("cliente_telefone", `%${phoneSuffix}`)
       .eq("unidade_id", os.unidade_id)
       .order("created_at", { ascending: false })
@@ -87,6 +87,19 @@ Deno.serve(async (req: Request) => {
 
     if (!conversa || !conversa.instancia) {
       return new Response(JSON.stringify({ skipped: true, reason: "no_conversa" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if the 24h WhatsApp window is open
+    // The window is open if the client sent a message within the last 24 hours
+    const lastClientMsg = conversa.ultima_resposta_cliente_at
+      ? new Date(conversa.ultima_resposta_cliente_at).getTime()
+      : 0;
+    const windowOpen = (Date.now() - lastClientMsg) < 24 * 60 * 60 * 1000;
+
+    if (!windowOpen) {
+      return new Response(JSON.stringify({ skipped: true, reason: "24h_window_closed" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

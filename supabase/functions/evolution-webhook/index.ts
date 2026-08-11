@@ -1003,14 +1003,14 @@ async function processMessage(
           .eq("id", conversa.coluna_pipeline)
           .maybeSingle();
 
-        if (currentColumn?.is_final) {
-          const { data: firstColumn } = await supabase
-            .from("atom_connect_pipeline_colunas")
-            .select("id")
-            .order("ordem", { ascending: true })
-            .limit(1)
-            .maybeSingle();
+        const { data: firstColumn } = await supabase
+          .from("atom_connect_pipeline_colunas")
+          .select("id")
+          .order("ordem", { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
+        if (currentColumn?.is_final) {
           if (firstColumn) {
             updateData.coluna_pipeline = firstColumn.id;
             updateData.is_bot_ativo = true;
@@ -1018,6 +1018,9 @@ async function processMessage(
             updateData.aguardando_avaliacao = false;
             updateData.regra_finalizacao_id = null;
           }
+        } else if (firstColumn && conversa.coluna_pipeline === firstColumn.id) {
+          // Conversation is in the first column (bot/triagem) — ensure bot is active
+          updateData.is_bot_ativo = true;
         }
       }
     }
@@ -1036,15 +1039,18 @@ async function processMessage(
       await processRatingResponse(supabase, conversa.id, trimmed, instancia);
 
       // If not awaiting rating and not a group, check if bot should respond
-      if (!conversa.aguardando_avaliacao && !groupInfo.isGroup) {
-        // Re-fetch conversa to get latest is_bot_ativo (may have changed above)
+      if (!groupInfo.isGroup) {
+        // Re-fetch conversa to get latest is_bot_ativo and column
         const { data: freshConversa } = await supabase
           .from("atom_connect_conversas")
-          .select("is_bot_ativo")
+          .select("is_bot_ativo, coluna_pipeline, aguardando_avaliacao")
           .eq("id", conversa.id)
           .maybeSingle();
 
-        if (freshConversa?.is_bot_ativo) {
+        // Skip if awaiting rating
+        if (freshConversa?.aguardando_avaliacao) {
+          // do nothing
+        } else if (freshConversa?.is_bot_ativo) {
           try {
             const giaUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/gia-atendimento`;
             const giaResp = await fetch(giaUrl, {
