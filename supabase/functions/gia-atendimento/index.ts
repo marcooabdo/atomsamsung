@@ -399,7 +399,8 @@ INSTRUÇÃO FINAL:
   return prompt;
 }
 
-async function sendWhatsAppMessage(supabase: any, conversa: any, text: string): Promise<void> {
+async function sendWhatsAppMessage(supabase: any, conversa: any, rawText: string): Promise<void> {
+  const text = `*GIA - Global Intelligence Assistant:*\n${rawText}`;
   let instancia = conversa.instancia;
 
   // If conversa has no instancia_id, look up by unidade_id
