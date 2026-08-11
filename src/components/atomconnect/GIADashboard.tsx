@@ -77,11 +77,11 @@ export function GIADashboard({ accentColor, unidadeId }: Props) {
 
     const [allResult, todayResult, weekResult, monthResult, activeConversas] = await Promise.all([
       baseQuery.order('created_at', { ascending: false }).limit(500),
-      supabase.from('gia_atendimento_logs').select('id, tokens_usados, transferiu_para_humano, tempo_resposta_ms, motivo_transferencia, mensagem_cliente, resposta_gia, created_at, conversa_id')
+      supabase.from('gia_atendimento_logs').select('id, tokens_usados, transferiu_para_humano, tempo_resposta_ms, motivo_transferencia, mensagem_cliente, resposta_gia, created_at, conversa_id, os_id')
         .gte('created_at', todayStart).order('created_at', { ascending: false }),
-      supabase.from('gia_atendimento_logs').select('id, tokens_usados, transferiu_para_humano, created_at')
+      supabase.from('gia_atendimento_logs').select('id, tokens_usados, transferiu_para_humano, created_at, resposta_gia')
         .gte('created_at', weekStart),
-      supabase.from('gia_atendimento_logs').select('id, tokens_usados, transferiu_para_humano, tempo_resposta_ms, created_at, mensagem_cliente, motivo_transferencia')
+      supabase.from('gia_atendimento_logs').select('id, tokens_usados, transferiu_para_humano, tempo_resposta_ms, created_at, mensagem_cliente, motivo_transferencia, resposta_gia')
         .gte('created_at', monthStart),
       supabase.from('atom_connect_conversas').select('id').eq('is_bot_ativo', true),
     ]);
@@ -91,15 +91,18 @@ export function GIADashboard({ accentColor, unidadeId }: Props) {
     const weekLogs = weekResult.data || [];
     const monthLogs = monthResult.data || [];
 
+    const failPattern = /n[aã]o\s+(consegui|localizei|encontrei|achei)|infelizmente|encaminhar.*equipe|n[aã]o\s+possuo/i;
+
     const tokensHoje = todayLogs.reduce((s, l) => s + (l.tokens_usados || 0), 0);
     const tokensMes = monthLogs.reduce((s, l) => s + (l.tokens_usados || 0), 0);
     const custoInput = (tokensMes * 0.6) / 1_000_000 * 0.15;
     const custoOutput = (tokensMes * 0.4) / 1_000_000 * 0.60;
     const custoEstimadoMes = custoInput + custoOutput;
 
-    const escaladosMes = monthLogs.filter(l => l.transferiu_para_humano).length;
+    const isEscalation = (l: any) => l.transferiu_para_humano || failPattern.test(l.resposta_gia || '');
+    const escaladosMes = monthLogs.filter(isEscalation).length;
     const taxaEscalacao = monthLogs.length > 0 ? (escaladosMes / monthLogs.length) * 100 : 0;
-    const escaladosHoje = todayLogs.filter(l => l.transferiu_para_humano).length;
+    const escaladosHoje = todayLogs.filter(isEscalation).length;
 
     const tempos = monthLogs.filter(l => l.tempo_resposta_ms > 0).map(l => l.tempo_resposta_ms);
     const tempoMedioResposta = tempos.length > 0 ? tempos.reduce((a, b) => a + b, 0) / tempos.length : 0;
@@ -124,33 +127,44 @@ export function GIADashboard({ accentColor, unidadeId }: Props) {
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const escalationLogs = allLogs.filter(l => l.transferiu_para_humano).slice(0, 20);
+    const escalationLogs = allLogs.filter(l =>
+      l.transferiu_para_humano || failPattern.test(l.resposta_gia || '')
+    ).slice(0, 20);
     const recentEscalations: DashMetrics['recentEscalations'] = [];
+    const conversaCache = new Map<string, string>();
     for (const l of escalationLogs) {
-      let clienteNome = '';
-      if (l.conversa_id) {
+      let clienteNome = conversaCache.get(l.conversa_id || '') || '';
+      if (!clienteNome && l.conversa_id) {
         const { data: conv } = await supabase
           .from('atom_connect_conversas')
           .select('cliente_nome')
           .eq('id', l.conversa_id)
           .maybeSingle();
         clienteNome = conv?.cliente_nome || '';
+        conversaCache.set(l.conversa_id, clienteNome);
       }
+      const motivo = l.motivo_transferencia
+        || (l.transferiu_para_humano ? 'Transferiu para humano' : null)
+        || (!l.os_id && /os|ordem/i.test(l.mensagem_cliente || '') ? 'OS não encontrada' : null)
+        || 'GIA não soube responder';
       recentEscalations.push({
         id: l.id,
         conversa_id: l.conversa_id,
         mensagem_cliente: l.mensagem_cliente,
         resposta_gia: l.resposta_gia,
-        motivo_transferencia: l.motivo_transferencia,
+        motivo_transferencia: motivo,
         created_at: l.created_at,
         cliente_nome: clienteNome,
       });
     }
 
     const motivoMap = new Map<string, number>();
-    for (const l of allLogs.filter(l => l.transferiu_para_humano && l.motivo_transferencia)) {
-      const m = l.motivo_transferencia;
-      motivoMap.set(m, (motivoMap.get(m) || 0) + 1);
+    for (const l of escalationLogs.filter(l => true)) {
+      const m = l.motivo_transferencia
+        || (l.transferiu_para_humano ? 'Transferiu para humano' : '')
+        || (!l.os_id && /os|ordem/i.test(l.mensagem_cliente || '') ? 'OS não encontrada' : '')
+        || 'Não soube responder';
+      if (m) motivoMap.set(m, (motivoMap.get(m) || 0) + 1);
     }
     const motivosEscalacao = Array.from(motivoMap.entries())
       .map(([motivo, count]) => ({ motivo, count }))
@@ -158,13 +172,10 @@ export function GIADashboard({ accentColor, unidadeId }: Props) {
       .slice(0, 10);
 
     const topicMap = new Map<string, number>();
-    for (const l of allLogs.filter(l => l.transferiu_para_humano && l.mensagem_cliente)) {
-      const words = l.mensagem_cliente.toLowerCase()
-        .replace(/[^\wàáâãéêíóôõúç\s]/g, '')
-        .split(/\s+/)
-        .filter((w: string) => w.length > 3);
-      const key = words.slice(0, 5).join(' ');
-      if (key.trim()) {
+    for (const l of allLogs.filter(l => l.mensagem_cliente && (l.transferiu_para_humano || failPattern.test(l.resposta_gia || '')))) {
+      const msg = l.mensagem_cliente.trim();
+      if (msg.length > 3) {
+        const key = msg.length > 60 ? msg.substring(0, 60) + '...' : msg;
         topicMap.set(key, (topicMap.get(key) || 0) + 1);
       }
     }

@@ -317,8 +317,17 @@ Deno.serve(async (req: Request) => {
       console.log(`[GIA Atendimento] Conversa ${conversa.id} movida para fila_espera - GIA encaminhou para equipe`);
     }
 
+    // Detect if GIA couldn't find OS or couldn't answer properly
+    const osNotFound = !osVinculada && /n[aã]o\s+(consegui|localizei|encontrei|achei)/i.test(cleanResponse);
+    const motivo = shouldQueue
+      ? "GIA encaminhou para equipe"
+      : osNotFound
+        ? "OS não encontrada"
+        : null;
+    const isEscalation = shouldQueue || osNotFound;
+
     await sendWhatsAppMessage(supabase, conversa, cleanResponse);
-    await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, cleanResponse, tokensUsed, false, null, Date.now() - startTime);
+    await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, cleanResponse, tokensUsed, isEscalation, motivo, Date.now() - startTime);
 
     if (osVinculada && !conversa.os_id) {
       await supabase
