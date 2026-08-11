@@ -1439,12 +1439,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
   const [retryingMedia, setRetryingMedia] = useState<Record<string, boolean>>({});
 
-  const [retryMediaError, setRetryMediaError] = useState<Record<string, string>>({});
-
   const retryMediaDownload = async (msg: Mensagem) => {
     if (!msg.message_id) return;
     setRetryingMedia(prev => ({ ...prev, [msg.id]: true }));
-    setRetryMediaError(prev => ({ ...prev, [msg.id]: '' }));
     try {
       const resp = await supabase.functions.invoke('evolution-webhook', {
         body: { action: 'retry-media', mensagem_id: msg.id },
@@ -1453,15 +1450,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       const result = resp.data;
       if (result?.media_url) {
         setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, media_url: result.media_url } : m));
-        setRetryMediaError(prev => ({ ...prev, [msg.id]: '' }));
-      } else {
-        const errMsg = result?.error || 'Mídia indisponível';
-        console.error('Retry media error:', errMsg);
-        setRetryMediaError(prev => ({ ...prev, [msg.id]: errMsg }));
       }
     } catch (e) {
       console.error('Retry media failed:', e);
-      setRetryMediaError(prev => ({ ...prev, [msg.id]: 'Erro de conexão' }));
     } finally {
       setRetryingMedia(prev => ({ ...prev, [msg.id]: false }));
     }
