@@ -239,7 +239,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const systemPrompt = buildSystemPrompt(conversa, osVinculada, unitKnowledge, orcamentoLink, pipelineMensagem);
+    const clientMsgCount = history.filter((m: any) => !m.from_me).length;
+    const hasTemplateSent = history.some((m: any) => m.from_me && m.metadata?.template_name);
+
+    const systemPrompt = buildSystemPrompt(conversa, osVinculada, unitKnowledge, orcamentoLink, pipelineMensagem, clientMsgCount, hasTemplateSent);
 
     const messages: Array<{ role: string; content: string }> = [
       { role: "system", content: systemPrompt },
@@ -369,7 +372,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string): string {
+function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string, clientMsgCount?: number, hasTemplateSent?: boolean): string {
   const nomeCliente = conversa.cliente_nome || "Cliente";
 
   let prompt = `Você é a GIA (Global Intelligence Assistant), assistente virtual de atendimento ao cliente de uma assistência técnica autorizada Samsung.
@@ -497,6 +500,22 @@ Diga algo como: "Preparei o link do orçamento para sua aprovação: ${orcamento
   }
 
   prompt += `
+REGRA PRIORITÁRIA — PRIMEIRO CONTATO SAMSUNG:
+DADOS DE DETECÇÃO: template_enviado=${hasTemplateSent ? 'SIM' : 'NAO'}, mensagens_do_cliente=${clientMsgCount ?? 0}.
+Se template_enviado=SIM e mensagens_do_cliente=1 (esta é a primeira resposta do cliente), você DEVE responder solicitando os documentos obrigatórios. Use uma mensagem acolhedora e profissional, similar a esta (adapte naturalmente, não copie literalmente):
+
+"Olá, ${nomeCliente}! Obrigada por responder 😊
+
+Entro em contato para dar andamento à sua solicitação de serviço. Para que possamos agilizar o processo, preciso que nos envie os seguintes itens:
+
+📸 *Foto da etiqueta com o número de série do produto*
+🧾 *Foto ou arquivo da Nota Fiscal de compra*
+📹 *Foto ou vídeo mostrando o defeito do produto*
+
+Assim que receber, encaminho para a equipe técnica e te dou um retorno o mais breve possível!"
+
+Essa regra tem PRIORIDADE sobre qualquer outra instrução. Só se aplica na primeira resposta do cliente após o template. Se o cliente já enviou mais mensagens antes, siga o fluxo normal.
+
 INSTRUÇÃO FINAL:
 - Responda a mensagem do cliente de forma natural e útil
 - Se for uma saudação, responda de forma acolhedora e pergunte como pode ajudar
