@@ -127,10 +127,15 @@ Deno.serve(async (req: Request) => {
     if (!osVinculada) {
       const textsToSearch = [mensagem_cliente, ...(history || []).filter((m: any) => !m.from_me).slice(-3).map((m: any) => m.conteudo || "")];
       const allText = textsToSearch.join(" ");
-      // Match numeric sequences that look like OS numbers (7-13 digits)
-      const osNumberMatch = allText.match(/\b(\d{7,13})\b/);
-      if (osNumberMatch) {
-        const osNumber = osNumberMatch[1];
+      // Match OS numbers: pure digits (7-13) or alphanumeric like G19398
+      const candidates: string[] = [];
+      const numericMatch = allText.match(/\b(\d{7,13})\b/);
+      if (numericMatch) candidates.push(numericMatch[1]);
+      const alphaMatch = allText.match(/\b([A-Za-z]\d{4,12})\b/);
+      if (alphaMatch) candidates.push(alphaMatch[1].toUpperCase());
+
+      for (const candidate of candidates) {
+        if (osVinculada) break;
         const { data: osByNumber } = await supabase
           .from("os")
           .select(`
@@ -141,8 +146,7 @@ Deno.serve(async (req: Request) => {
             os_pecas:os_pecas(pn, descricao, quantidade, valor_unitario, status_gspn),
             pagamentos:pagamentos(forma_pagamento, valor, created_at)
           `)
-          .or(`numero_os_samsung.eq.${osNumber},numero_os_interna.eq.${osNumber}`)
-          .neq("arquivada", true)
+          .or(`numero_os_samsung.eq.${candidate},numero_os_interna.ilike.${candidate}`)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
