@@ -230,6 +230,97 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
 
+    // Retry media download for messages with missing media_url
+    if (body.action === "retry-media") {
+      const { mensagem_id } = body;
+      if (!mensagem_id) {
+        return new Response(JSON.stringify({ error: "mensagem_id required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: msg, error: msgErr } = await supabase
+        .from("atom_connect_mensagens")
+        .select("id, message_id, conversa_id, from_me, media_mimetype, media_url, tipo")
+        .eq("id", mensagem_id)
+        .single();
+
+      if (msgErr || !msg) {
+        return new Response(JSON.stringify({ error: "Mensagem não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (msg.media_url) {
+        return new Response(JSON.stringify({ media_url: msg.media_url }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: conv } = await supabase
+        .from("atom_connect_conversas")
+        .select("cliente_telefone, instancia_id, is_group, group_jid")
+        .eq("id", msg.conversa_id)
+        .single();
+
+      if (!conv?.instancia_id) {
+        return new Response(JSON.stringify({ error: "Conversa ou instância não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: inst } = await supabase
+        .from("atom_connect_instancias")
+        .select("api_url, api_key, instance_name")
+        .eq("id", conv.instancia_id)
+        .single();
+
+      if (!inst) {
+        return new Response(JSON.stringify({ error: "Instância não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const remoteJid = conv.is_group && conv.group_jid
+        ? conv.group_jid
+        : conv.cliente_telefone
+          ? `${conv.cliente_telefone}@s.whatsapp.net`
+          : undefined;
+
+      const mimetype = msg.media_mimetype || "application/octet-stream";
+      let mediaUrl: string | null = null;
+
+      mediaUrl = await fetchAndUploadMedia(
+        supabase,
+        inst,
+        msg.message_id,
+        mimetype,
+        msg.conversa_id,
+        remoteJid,
+        msg.from_me
+      );
+
+      if (mediaUrl) {
+        await supabase
+          .from("atom_connect_mensagens")
+          .update({ media_url: mediaUrl })
+          .eq("id", msg.id);
+      }
+
+      return new Response(
+        JSON.stringify(mediaUrl ? { media_url: mediaUrl } : { error: "Não foi possível baixar a mídia" }),
+        {
+          status: mediaUrl ? 200 : 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const rawEvent = body.event || body.type || body.action || "";
     const event = normalizeEvent(rawEvent);
     const data = body.data || body;

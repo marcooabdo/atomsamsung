@@ -1440,44 +1440,18 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [retryingMedia, setRetryingMedia] = useState<Record<string, boolean>>({});
 
   const retryMediaDownload = async (msg: Mensagem) => {
-    if (!instancia || !msg.message_id) return;
+    if (!msg.message_id) return;
     setRetryingMedia(prev => ({ ...prev, [msg.id]: true }));
     try {
-      const remoteJid = conversa?.telefone
-        ? `${conversa.telefone}@s.whatsapp.net`
-        : undefined;
-      const resp = await fetch(`${instancia.api_url}/chat/getBase64FromMediaMessage/${instancia.instance_name}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: instancia.api_key },
-        body: JSON.stringify({
-          message: { key: { id: msg.message_id, remoteJid, fromMe: msg.from_me } },
-          convertToMp4: false,
-        }),
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await supabase.functions.invoke('evolution-webhook', {
+        body: { action: 'retry-media', mensagem_id: msg.id },
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const result = await resp.json();
-      const b64 = result.base64 || result.data || result.media;
-      if (!b64 || b64.length < 100) throw new Error('No media data');
 
-      const clean = b64.replace(/^data:[^;]+;base64,/, '');
-      const binary = atob(clean);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-      const ext = getExtensionFromMimetype(msg.media_mimetype || 'application/octet-stream');
-      const fileName = `${msg.conversa_id}/${msg.message_id}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('atom-connect-media')
-        .upload(fileName, bytes, { contentType: msg.media_mimetype || 'application/octet-stream', upsert: true });
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('atom-connect-media')
-        .getPublicUrl(fileName);
-
-      await supabase.from('atom_connect_mensagens').update({ media_url: publicUrl }).eq('id', msg.id);
-
-      setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, media_url: publicUrl } : m));
+      const result = resp.data;
+      if (result?.media_url) {
+        setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, media_url: result.media_url } : m));
+      }
     } catch (e) {
       console.error('Retry media failed:', e);
     } finally {
