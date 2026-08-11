@@ -358,7 +358,29 @@ INSTRUÇÃO FINAL:
 }
 
 async function sendWhatsAppMessage(supabase: any, conversa: any, text: string): Promise<void> {
-  const instancia = conversa.instancia;
+  let instancia = conversa.instancia;
+
+  // If conversa has no instancia_id, look up by unidade_id
+  if (!instancia && conversa.unidade_id) {
+    const { data: unitInstance } = await supabase
+      .from("atom_connect_instancias")
+      .select("*")
+      .eq("unidade_id", conversa.unidade_id)
+      .eq("status", "connected")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (unitInstance) {
+      instancia = unitInstance;
+      // Also fix the conversa so future messages work
+      await supabase
+        .from("atom_connect_conversas")
+        .update({ instancia_id: unitInstance.id })
+        .eq("id", conversa.id);
+    }
+  }
+
   if (!instancia) {
     console.error("[GIA Atendimento] No instancia found for conversa", conversa.id);
     return;
