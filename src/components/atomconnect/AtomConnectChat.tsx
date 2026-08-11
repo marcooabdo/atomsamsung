@@ -1443,8 +1443,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     if (!instancia || !msg.message_id) return;
     setRetryingMedia(prev => ({ ...prev, [msg.id]: true }));
     try {
-      const remoteJid = conversaSelecionada?.telefone
-        ? `${conversaSelecionada.telefone}@s.whatsapp.net`
+      const remoteJid = conversa?.telefone
+        ? `${conversa.telefone}@s.whatsapp.net`
         : undefined;
       const resp = await fetch(`${instancia.api_url}/chat/getBase64FromMediaMessage/${instancia.instance_name}`, {
         method: 'POST',
