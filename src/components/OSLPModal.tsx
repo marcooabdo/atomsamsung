@@ -790,7 +790,10 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
       if (!response.ok) return false;
       const data = await response.json();
-      return data?.[0]?.exists === true;
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0].exists === true || !!data[0].jid;
+      }
+      return false;
     } catch (error) {
       return false;
     }
