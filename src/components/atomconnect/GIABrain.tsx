@@ -84,8 +84,18 @@ const COLUNAS_PIPELINE = [
 ];
 
 export function GIABrain({ accentColor, unidadeId }: Props) {
-  const { usuario } = useAuth();
+  const { usuario, unidadeAtual, unidades: allUnidades, unidadesAdicionais } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'conhecimento' | 'pipeline'>('dashboard');
+  const [selectedUnit, setSelectedUnit] = useState<string | undefined>(unidadeId);
+
+  const isMasterDiretoria = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const accessibleUnits = isMasterDiretoria
+    ? allUnidades
+    : allUnidades.filter(u => u.id === unidadeAtual || unidadesAdicionais.includes(u.id));
+
+  useEffect(() => {
+    setSelectedUnit(unidadeId);
+  }, [unidadeId]);
 
   const tabs = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: MonitorSpeaker },
@@ -95,14 +105,30 @@ export function GIABrain({ accentColor, unidadeId }: Props) {
 
   return (
     <div className="h-full flex flex-col gap-4 p-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${accentColor}20` }}>
-          <Brain className="w-5 h-5" style={{ color: accentColor }} />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${accentColor}20` }}>
+            <Brain className="w-5 h-5" style={{ color: accentColor }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>GIA Brain</h2>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Cérebro da GIA — Ensinamentos e Mensagens Automáticas</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>GIA Brain</h2>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Cérebro da GIA — Ensinamentos e Mensagens Automáticas</p>
-        </div>
+
+        {accessibleUnits.length > 1 && (
+          <select
+            value={selectedUnit || ''}
+            onChange={e => setSelectedUnit(e.target.value || undefined)}
+            className="px-3 py-2 rounded-lg text-sm border-0 outline-none"
+            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+          >
+            {isMasterDiretoria && <option value="">Todas as Unidades</option>}
+            {accessibleUnits.map(u => (
+              <option key={u.id} value={u.id}>{u.nome}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-tertiary)' }}>
@@ -129,13 +155,13 @@ export function GIABrain({ accentColor, unidadeId }: Props) {
 
       <div className="flex-1 overflow-auto">
         {activeTab === 'dashboard' && (
-          <GIADashboard accentColor={accentColor} unidadeId={unidadeId} />
+          <GIADashboard accentColor={accentColor} unidadeId={selectedUnit} />
         )}
         {activeTab === 'conhecimento' && (
-          <ConhecimentoTab accentColor={accentColor} unidadeId={unidadeId} usuarioId={usuario?.id} />
+          <ConhecimentoTab accentColor={accentColor} unidadeId={selectedUnit} usuarioId={usuario?.id} />
         )}
         {activeTab === 'pipeline' && (
-          <PipelineMensagensTab accentColor={accentColor} unidadeId={unidadeId} usuarioId={usuario?.id} />
+          <PipelineMensagensTab accentColor={accentColor} unidadeId={selectedUnit} usuarioId={usuario?.id} />
         )}
       </div>
     </div>
@@ -236,6 +262,11 @@ function ConhecimentoTab({ accentColor, unidadeId, usuarioId }: { accentColor: s
   const filtered = items.filter(i => {
     if (searchTerm && !i.titulo.toLowerCase().includes(searchTerm.toLowerCase()) && !i.conteudo.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (filterCategoria && i.categoria !== filterCategoria) return false;
+    if (unidadeId) {
+      const isUniversal = !i.unidade_ids || i.unidade_ids.length === 0;
+      const matchesUnit = i.unidade_ids?.includes(unidadeId);
+      if (!isUniversal && !matchesUnit) return false;
+    }
     return true;
   });
 
@@ -538,7 +569,14 @@ function PipelineMensagensTab({ accentColor, unidadeId, usuarioId }: { accentCol
       </p>
 
       {COLUNAS_PIPELINE.map(coluna => {
-        const colMsgs = mensagens.filter(m => m.coluna_kanban === coluna.id);
+        const colMsgs = mensagens.filter(m => {
+          if (m.coluna_kanban !== coluna.id) return false;
+          if (unidadeId) {
+            const isUniversal = !m.unidade_ids || m.unidade_ids.length === 0;
+            if (!isUniversal && !m.unidade_ids?.includes(unidadeId)) return false;
+          }
+          return true;
+        });
         const isExpanded = expandedColumn === coluna.id;
 
         return (
