@@ -1172,7 +1172,11 @@ async function processMessage(
     if (thisMsg && !thisMsg.is_bot && conversa.is_bot_ativo) {
       await supabase
         .from("atom_connect_conversas")
-        .update({ is_bot_ativo: false })
+        .update({
+          is_bot_ativo: false,
+          aguardando_avaliacao: false,
+          regra_finalizacao_id: null,
+        })
         .eq("id", conversa.id);
     }
   }

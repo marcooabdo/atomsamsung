@@ -863,7 +863,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       if (conversa.is_bot_ativo) {
         await supabase
           .from('atom_connect_conversas')
-          .update({ is_bot_ativo: false })
+          .update({
+            is_bot_ativo: false,
+            aguardando_avaliacao: false,
+            regra_finalizacao_id: null,
+          })
           .eq('id', conversa.id);
 
         await supabase
@@ -1054,12 +1058,48 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   };
 
   const handleFinalizarComDados = async (data: ClosureData) => {
+    const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
+
+    const { data: regraDefault } = await supabase
+      .from('atom_connect_regras_finalizacao')
+      .select('*')
+      .eq('unidade_id', targetUnidadeId)
+      .eq('ativo', true)
+      .order('is_default', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const hasRegraMsg = regraDefault && regraDefault.mensagem_avaliacao;
+
+    if (hasRegraMsg && instancia) {
+      try {
+        const evolutionMessageId = await sendToEvolutionAPI(regraDefault.mensagem_avaliacao);
+
+        await supabase
+          .from('atom_connect_mensagens')
+          .insert({
+            conversa_id: conversa.id,
+            message_id: evolutionMessageId || `system-finalizar-${Date.now()}`,
+            from_me: true,
+            tipo: 'text',
+            conteudo: regraDefault.mensagem_avaliacao,
+            status: evolutionMessageId ? 'sent' : 'failed',
+            is_bot: true,
+            metadata: { tipo: 'avaliacao_request', regra_id: regraDefault.id }
+          });
+      } catch {
+        // continue even if message fails
+      }
+    }
+
     await supabase
       .from('atom_connect_conversas')
       .update({
         coluna_pipeline: 'finalizado_nps',
-        is_bot_ativo: false,
-        aguardando_avaliacao: false,
+        is_bot_ativo: !!hasRegraMsg,
+        aguardando_avaliacao: !!hasRegraMsg,
+        regra_finalizacao_id: hasRegraMsg ? regraDefault.id : null,
+        avaliacao_enviada_at: hasRegraMsg ? new Date().toISOString() : null,
         resultado_conversa: data.resultado_conversa,
         valor_orcamento: data.valor_orcamento,
         resumo_fechamento: data.resumo_fechamento,
@@ -1071,9 +1111,24 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       })
       .eq('id', conversa.id);
 
+    if (hasRegraMsg) {
+      await supabase
+        .from('atom_connect_mensagens')
+        .insert({
+          conversa_id: conversa.id,
+          message_id: `system-gia-on-${Date.now()}`,
+          from_me: true,
+          tipo: 'text',
+          conteudo: '🤖 GIA ativada para acompanhar a finalização. Aguardando resposta do cliente.',
+          status: 'sent',
+          is_bot: true
+        });
+    }
+
     setShowFinalizarConversaModal(false);
     setShowFinalizarModal(false);
     onUpdate();
+    loadMensagens();
   };
 
   const currentWidthRef = useRef(chatWidth);
