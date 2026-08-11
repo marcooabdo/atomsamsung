@@ -1034,6 +1034,58 @@ async function processMessage(
     const handledByGIA = await processGIASchedulingResponse(supabase, phoneNumber, trimmed, instancia);
     if (!handledByGIA) {
       await processRatingResponse(supabase, conversa.id, trimmed, instancia);
+
+      // If not awaiting rating and not a group, check if bot should respond
+      if (!conversa.aguardando_avaliacao && !groupInfo.isGroup) {
+        // Re-fetch conversa to get latest is_bot_ativo (may have changed above)
+        const { data: freshConversa } = await supabase
+          .from("atom_connect_conversas")
+          .select("is_bot_ativo")
+          .eq("id", conversa.id)
+          .maybeSingle();
+
+        if (freshConversa?.is_bot_ativo) {
+          try {
+            const giaUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/gia-atendimento`;
+            const giaResp = await fetch(giaUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({
+                conversa_id: conversa.id,
+                mensagem_cliente: trimmed,
+              }),
+            });
+            if (!giaResp.ok) {
+              console.error("[Webhook] GIA atendimento call failed:", giaResp.status);
+            }
+          } catch (giaErr) {
+            console.error("[Webhook] GIA atendimento error:", giaErr);
+          }
+        }
+      }
+    }
+  }
+
+  // When a human agent sends a message (fromMe, not a bot echo), disable the bot
+  if (fromMe && !conversa.is_interno && !groupInfo.isGroup) {
+    // Check if this message was sent by a human (not the bot)
+    // Bot messages have is_bot=true; human messages from the UI come through Evolution as fromMe
+    const { data: thisMsg } = await supabase
+      .from("atom_connect_mensagens")
+      .select("is_bot")
+      .eq("conversa_id", conversa.id)
+      .eq("message_id", messageId)
+      .maybeSingle();
+
+    // If the message is NOT from the bot AND bot is currently active, disable it
+    if (thisMsg && !thisMsg.is_bot && conversa.is_bot_ativo) {
+      await supabase
+        .from("atom_connect_conversas")
+        .update({ is_bot_ativo: false })
+        .eq("id", conversa.id);
     }
   }
 

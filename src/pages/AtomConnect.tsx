@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   MessageSquare, Users, BarChart3, Settings, Zap, Bell, Search,
   AlertTriangle, ArrowRight,
-  X, Volume2, VolumeX, Megaphone, GitBranch, Radio, Building2, ChevronDown
+  X, Volume2, VolumeX, Megaphone, GitBranch, Radio, Building2, ChevronDown, Brain
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,10 +16,11 @@ import { AtomConnectDashboard } from '../components/atomconnect/AtomConnectDashb
 import { AtomConnectMarketing } from '../components/atomconnect/AtomConnectMarketing';
 import { AtomConnectAutomation } from '../components/atomconnect/AtomConnectAutomation';
 import { AtomConnectSettings } from '../components/atomconnect/AtomConnectSettings';
+import { GIABrain } from '../components/atomconnect/GIABrain';
 import { AtomConnectNotification } from '../components/atomconnect/AtomConnectNotification';
 import { NovaConversaModal } from '../components/atomconnect/NovaConversaModal';
 
-type TabType = 'kanban' | 'dashboard' | 'marketing' | 'automation' | 'settings';
+type TabType = 'kanban' | 'dashboard' | 'marketing' | 'automation' | 'gia_brain' | 'settings';
 
 interface Conversa {
   id: string;
@@ -389,6 +390,7 @@ export default function AtomConnect() {
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: BarChart3 },
     { id: 'marketing' as TabType, label: 'Marketing', icon: Megaphone },
     { id: 'automation' as TabType, label: 'Automacao', icon: GitBranch },
+    { id: 'gia_brain' as TabType, label: 'GIA Brain', icon: Brain },
     { id: 'settings' as TabType, label: 'Configurações', icon: Settings },
   ];
 
@@ -686,6 +688,18 @@ export default function AtomConnect() {
                 className="h-full"
               >
                 <AtomConnectAutomation accentColor={accentColor} unidadeId={selectedUnidadeFilter || unidadeAtual || undefined} />
+              </motion.div>
+            )}
+            {activeTab === 'gia_brain' && (
+              <motion.div
+                key="gia_brain"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="h-full"
+              >
+                <GIABrain accentColor={accentColor} unidadeId={selectedUnidadeFilter || unidadeAtual || undefined} />
               </motion.div>
             )}
             {activeTab === 'settings' && (

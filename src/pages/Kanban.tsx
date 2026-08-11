@@ -117,6 +117,20 @@ const COLUNAS_IH = [
   'reparo_concluido'
 ];
 
+async function notifyPipelineChange(osId: string, colunaKanban: string, colunaAnterior: string) {
+  try {
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gia-pipeline-notify`;
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ os_id: osId, coluna_kanban: colunaKanban, coluna_anterior: colunaAnterior }),
+    }).catch(() => {});
+  } catch {}
+}
+
 export function Kanban() {
   const { usuario, unidadesAdicionais, allUserUnits } = useAuth();
   const [osData, setOsData] = useState<Record<string, OS[]>>({});
@@ -1314,6 +1328,8 @@ export function Kanban() {
         .eq('id', osId);
       if (error) throw error;
 
+      notifyPipelineChange(osId, targetColumn, draggedCard.coluna_kanban);
+
       setOsData(prevData => {
         const newData = { ...prevData };
         newData[prevColumn] = (newData[prevColumn] || []).filter(os => os.id !== osId);
@@ -1822,6 +1838,8 @@ export function Kanban() {
         .eq('id', os.id);
 
       if (error) throw error;
+
+      notifyPipelineChange(os.id, targetColumn, os.coluna_kanban);
 
       const updatedCard = { ...os, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
 
