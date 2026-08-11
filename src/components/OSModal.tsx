@@ -570,26 +570,30 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
   const checkWhatsAppNumber = async (phone: string, apiUrl: string, apiKey: string, instanceName: string): Promise<string | false> => {
     const variants = getPhoneVariants(phone);
-    try {
-      const response = await fetch(`${apiUrl}/chat/whatsappNumbers/${instanceName}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiKey
-        },
-        body: JSON.stringify({ numbers: variants })
-      });
+    for (const variant of variants) {
+      try {
+        const response = await fetch(`${apiUrl}/chat/whatsappNumbers/${instanceName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': apiKey
+          },
+          body: JSON.stringify({ numbers: [variant] })
+        });
 
-      if (!response.ok) return false;
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        const found = data.find((d: any) => d.exists === true || !!d.jid);
-        if (found) return found.jid?.split('@')[0] || variants[0];
+        if (!response.ok) continue;
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[0];
+          if (item.exists === true || item.jid) {
+            return item.jid?.split('@')[0] || variant;
+          }
+        }
+      } catch {
+        continue;
       }
-      return false;
-    } catch (error) {
-      return false;
     }
+    return false;
   };
 
   const handlePhoneClick = async (phone: string | null) => {
@@ -656,11 +660,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         instancia.instance_name
       );
 
-      if (!confirmedPhone) {
-        setWhatsAppError('Este numero nao possui WhatsApp');
-        setLoadingWhatsApp(false);
-        return;
-      }
+      const phoneToUse = confirmedPhone || formattedPhone;
 
       let colQuery = supabase
         .from('atom_connect_pipeline_colunas')
@@ -678,7 +678,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         .from('atom_connect_conversas')
         .insert({
           unidade_id: os.unidade_id,
-          cliente_telefone: confirmedPhone,
+          cliente_telefone: phoneToUse,
           cliente_nome: os.cliente_nome || null,
           os_id: os.id,
           coluna_pipeline: firstColumn?.id || 'bot_triagem',
