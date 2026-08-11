@@ -126,15 +126,25 @@ Deno.serve(async (req: Request) => {
     }
 
     async function findOSByNumber(candidate: string) {
-      const { data, error } = await supabase
+      // Search samsung number first (exact match)
+      const { data: bySamsung, error: e1 } = await supabase
         .from("os")
         .select("id")
-        .or(`numero_os_samsung.eq.${candidate},numero_os_interna.ilike.${candidate}`)
-        .order("created_at", { ascending: false })
+        .eq("numero_os_samsung", candidate)
         .limit(1)
         .maybeSingle();
-      if (error) console.error("findOSByNumber error:", error.message, "candidate:", candidate);
-      return data?.id || null;
+      if (e1) console.error("findOSByNumber samsung error:", e1.message, candidate);
+      if (bySamsung?.id) return bySamsung.id;
+
+      // Fallback: search internal number (case-insensitive)
+      const { data: byInterna, error: e2 } = await supabase
+        .from("os")
+        .select("id")
+        .ilike("numero_os_interna", candidate)
+        .limit(1)
+        .maybeSingle();
+      if (e2) console.error("findOSByNumber interna error:", e2.message, candidate);
+      return byInterna?.id || null;
     }
 
     let osVinculada: any = null;
@@ -263,7 +273,11 @@ Deno.serve(async (req: Request) => {
 
     const shouldEscalate = rawResponse.includes("[TRANSFERIR_HUMANO]");
     const shouldQueue = rawResponse.includes("[ENCAMINHAR_EQUIPE]");
-    const cleanResponse = rawResponse.replace(/\[TRANSFERIR_HUMANO\]/g, "").replace(/\[ENCAMINHAR_EQUIPE\]/g, "").trim();
+    const cleanResponse = rawResponse
+      .replace(/\[TRANSFERIR_HUMANO\]/g, "")
+      .replace(/\[ENCAMINHAR_EQUIPE\]/g, "")
+      .replace(/^\*?GIA\s*[-–—]\s*Global Intelligence Assistant:?\*?\s*/i, "")
+      .trim();
 
     if (shouldEscalate || !cleanResponse) {
       await escalateToHuman(supabase, conversa, shouldEscalate ? "Cliente pediu atendente humano" : "Resposta vazia da IA");
@@ -324,6 +338,7 @@ REGRAS OBRIGATÓRIAS:
 7. NÃO mencione a possibilidade de transferir para atendente humano a menos que o cliente peça. Resolva você mesma o máximo possível
 8. Quando você NÃO conseguir resolver algo e precisar que a equipe verifique (ex: não encontrou a OS, não tem a informação solicitada), inclua [ENCAMINHAR_EQUIPE] na resposta. Isso coloca o cliente na fila de espera para um atendente verificar
 9. Formate com *negrito* para destacar informações importantes (formato WhatsApp)
+10. NUNCA inclua seu nome ou cabeçalho como "GIA - Global Intelligence Assistant:" no início da resposta. Apenas responda diretamente ao cliente. O sistema já adiciona o cabeçalho automaticamente
 
 PERSONALIDADE:
 - Acolhedora e paciente
