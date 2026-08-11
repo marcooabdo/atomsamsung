@@ -74,23 +74,22 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const [historyResult, osResult, knowledgeResult] = await Promise.all([
+    const OS_DETAIL_SELECT = `
+      *,
+      unidade:unidades!os_unidade_id_fkey(nome),
+      tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome),
+      tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome),
+      os_pecas:os_pecas(pn, descricao, quantidade, valor_unitario, status_gspn),
+      pagamentos:pagamentos(forma_pagamento, valor, created_at)
+    `;
+
+    const [historyResult, knowledgeResult] = await Promise.all([
       supabase
         .from("atom_connect_mensagens")
         .select("from_me, conteudo, tipo, is_bot, created_at, metadata, caption")
         .eq("conversa_id", conversa_id)
         .order("created_at", { ascending: false })
         .limit(MAX_HISTORY_MESSAGES),
-      conversa.os_id
-        ? supabase.from("os").select(`
-            *,
-            unidade:unidades!os_unidade_id_fkey(nome),
-            tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome),
-            tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome),
-            os_pecas:os_pecas(pn, descricao, quantidade, valor_unitario, status_gspn),
-            pagamentos:pagamentos(forma_pagamento, valor, created_at)
-          `).eq("id", conversa.os_id).maybeSingle()
-        : Promise.resolve({ data: null }),
       supabase
         .from("gia_base_conhecimento")
         .select("titulo, conteudo, categoria")
@@ -99,70 +98,76 @@ Deno.serve(async (req: Request) => {
     ]);
 
     const history = (historyResult.data || []).reverse();
-    const os = osResult.data;
 
-    let osVinculada = os;
-    if (!osVinculada && conversa.cliente_telefone) {
-      const phone = conversa.cliente_telefone.replace(/\D/g, "");
-      const phoneSuffix = phone.length >= 10 ? phone.slice(-10) : phone;
-      const { data: osByPhone } = await supabase
+    async function loadOSDetails(osId: string) {
+      const { data, error } = await supabase.from("os").select(OS_DETAIL_SELECT).eq("id", osId).maybeSingle();
+      if (error) console.error("loadOSDetails error:", error.message);
+      return data;
+    }
+
+    async function findOSById(osId: string) {
+      const { data } = await supabase.from("os").select("id").eq("id", osId).maybeSingle();
+      return data?.id || null;
+    }
+
+    async function findOSByPhone(phone: string) {
+      const suffix = phone.replace(/\D/g, "");
+      const phoneSuffix = suffix.length >= 10 ? suffix.slice(-10) : suffix;
+      const { data, error } = await supabase
         .from("os")
-        .select(`
-          *,
-          unidade:unidades!os_unidade_id_fkey(nome),
-          tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome),
-          tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome),
-          os_pecas:os_pecas(pn, descricao, quantidade, valor_unitario, status_gspn),
-          pagamentos:pagamentos(forma_pagamento, valor, created_at)
-        `)
+        .select("id")
         .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
         .neq("arquivada", true)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (osByPhone) osVinculada = osByPhone;
+      if (error) console.error("findOSByPhone error:", error.message);
+      return data?.id || null;
     }
 
-    // If still no OS found, try to extract an OS number from the client's message or recent history
+    async function findOSByNumber(candidate: string) {
+      const { data, error } = await supabase
+        .from("os")
+        .select("id")
+        .or(`numero_os_samsung.eq.${candidate},numero_os_interna.ilike.${candidate}`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) console.error("findOSByNumber error:", error.message, "candidate:", candidate);
+      return data?.id || null;
+    }
+
+    let osVinculada: any = null;
+
+    // 1) Try linked OS
+    if (conversa.os_id) {
+      osVinculada = await loadOSDetails(conversa.os_id);
+    }
+
+    // 2) Try by phone
+    if (!osVinculada && conversa.cliente_telefone) {
+      const foundId = await findOSByPhone(conversa.cliente_telefone);
+      if (foundId) osVinculada = await loadOSDetails(foundId);
+    }
+
+    // 3) Try extracting OS number from message or recent history
     if (!osVinculada) {
       const textsToSearch = [mensagem_cliente, ...(history || []).filter((m: any) => !m.from_me).slice(-3).map((m: any) => m.conteudo || "")];
       const allText = textsToSearch.join(" ");
-      // Match OS numbers: pure digits (7-13) or alphanumeric like G19398
       const candidates: string[] = [];
-      const numericMatch = allText.match(/\b(\d{7,13})\b/);
-      if (numericMatch) candidates.push(numericMatch[1]);
+      const numericMatches = allText.matchAll(/\b(\d{7,13})\b/g);
+      for (const m of numericMatches) candidates.push(m[1]);
       const alphaMatch = allText.match(/\b([A-Za-z]\d{4,12})\b/);
       if (alphaMatch) candidates.push(alphaMatch[1].toUpperCase());
 
       for (const candidate of candidates) {
         if (osVinculada) break;
-        const { data: osByNumber } = await supabase
-          .from("os")
-          .select(`
-            *,
-            unidade:unidades!os_unidade_id_fkey(nome),
-            tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome),
-            tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome),
-            os_pecas:os_pecas(pn, descricao, quantidade, valor_unitario, status_gspn),
-            pagamentos:pagamentos(forma_pagamento, valor, created_at)
-          `)
-          .or(`numero_os_samsung.eq.${candidate},numero_os_interna.ilike.${candidate}`)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (osByNumber) osVinculada = osByNumber;
+        const foundId = await findOSByNumber(candidate);
+        if (foundId) osVinculada = await loadOSDetails(foundId);
       }
     }
 
-    const allKnowledge = (knowledgeResult.data || []).filter((k: any) => {
-      if (!k) return false;
-      return true;
-    });
-
-    const unitKnowledge = allKnowledge.filter((k: any) => {
-      // No unidade_ids means it applies to all units
-      return true;
-    });
+    const unitKnowledge = (knowledgeResult.data || []).filter((k: any) => !!k);
 
     let orcamentoLink = "";
     if (osVinculada) {
