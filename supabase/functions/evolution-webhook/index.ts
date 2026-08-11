@@ -1031,8 +1031,9 @@ async function processMessage(
       .eq("id", conversa.id);
   }
 
-  if (!fromMe && tipo === "text" && conteudo && !conversa.is_interno) {
-    const trimmed = conteudo.trim();
+  const giaEligibleTypes = ["text", "image", "document", "video", "audio", "sticker", "location", "contact"];
+  if (!fromMe && giaEligibleTypes.includes(tipo) && !conversa.is_interno) {
+    const trimmed = (conteudo || "").trim();
 
     const handledByGIA = await processGIASchedulingResponse(supabase, phoneNumber, trimmed, instancia);
     if (!handledByGIA) {
@@ -1061,7 +1062,8 @@ async function processMessage(
               },
               body: JSON.stringify({
                 conversa_id: conversa.id,
-                mensagem_cliente: trimmed,
+                mensagem_cliente: trimmed || `[${tipo.toUpperCase()}]`,
+                tipo_mensagem: tipo,
               }),
             });
             if (!giaResp.ok) {

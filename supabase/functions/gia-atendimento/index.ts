@@ -35,7 +35,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { conversa_id, mensagem_cliente } = await req.json();
+    const { conversa_id, mensagem_cliente, tipo_mensagem } = await req.json();
     if (!conversa_id || !mensagem_cliente) {
       return new Response(JSON.stringify({ error: "conversa_id and mensagem_cliente required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
     const [historyResult, osResult, knowledgeResult] = await Promise.all([
       supabase
         .from("atom_connect_mensagens")
-        .select("from_me, conteudo, tipo, is_bot, created_at")
+        .select("from_me, conteudo, tipo, is_bot, created_at, metadata, caption")
         .eq("conversa_id", conversa_id)
         .order("created_at", { ascending: false })
         .limit(MAX_HISTORY_MESSAGES),
@@ -194,15 +194,39 @@ Deno.serve(async (req: Request) => {
     ];
 
     for (const msg of history) {
-      if (msg.tipo !== "text" && msg.tipo !== "image" && msg.tipo !== "document") continue;
       const role = msg.from_me ? "assistant" : "user";
       let content = msg.conteudo || "";
-      if (msg.tipo === "image") content = "[Cliente enviou uma imagem]";
-      if (msg.tipo === "document") content = "[Cliente enviou um documento]";
+      const templateName = msg.metadata?.template_name;
+      if (templateName && msg.from_me) {
+        content = `[TEMPLATE ENVIADO: ${templateName}] ${content}`;
+      }
+      if (!msg.from_me) {
+        if (msg.tipo === "image") content = `[CLIENTE ENVIOU IMAGEM/FOTO${msg.caption ? `: ${msg.caption}` : ""}]`;
+        else if (msg.tipo === "document") content = `[CLIENTE ENVIOU DOCUMENTO${msg.caption ? `: ${msg.caption}` : ""}]`;
+        else if (msg.tipo === "video") content = `[CLIENTE ENVIOU VÍDEO${msg.caption ? `: ${msg.caption}` : ""}]`;
+        else if (msg.tipo === "audio") content = "[CLIENTE ENVIOU ÁUDIO]";
+        else if (msg.tipo === "sticker") content = "[CLIENTE ENVIOU FIGURINHA]";
+        else if (msg.tipo === "location") content = "[CLIENTE ENVIOU LOCALIZAÇÃO]";
+        else if (msg.tipo === "contact") content = "[CLIENTE ENVIOU CONTATO]";
+      }
       if (content.trim()) messages.push({ role, content });
     }
 
-    messages.push({ role: "user", content: mensagem_cliente });
+    let userContent = mensagem_cliente;
+    if (tipo_mensagem && tipo_mensagem !== "text") {
+      const tipoLabels: Record<string, string> = {
+        image: "IMAGEM/FOTO",
+        document: "DOCUMENTO",
+        video: "VÍDEO",
+        audio: "ÁUDIO",
+        sticker: "FIGURINHA",
+        location: "LOCALIZAÇÃO",
+        contact: "CONTATO",
+      };
+      const label = tipoLabels[tipo_mensagem] || tipo_mensagem.toUpperCase();
+      userContent = `[CLIENTE ENVIOU ${label}] ${mensagem_cliente}`;
+    }
+    messages.push({ role: "user", content: userContent });
 
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -379,7 +403,8 @@ Diga algo como: "Preparei o link do orçamento para sua aprovação: ${orcamento
   }
 
   if (knowledge.length > 0) {
-    prompt += "\nBASE DE CONHECIMENTO (use estas informações para responder):\n";
+    prompt += "\n=== INSTRUÇÕES E BASE DE CONHECIMENTO ===\n";
+    prompt += "IMPORTANTE: As instruções abaixo são REGRAS que você DEVE seguir. Quando uma instrução mencionar um template específico (ex: 'se for o template inicial_os'), verifique no histórico se esse template foi enviado (aparece como [TEMPLATE ENVIADO: nome_do_template]). Quando mencionar tipos de mensagem (ex: 'se o cliente enviou anexo/foto/documento'), verifique os indicadores no histórico (ex: [CLIENTE ENVIOU IMAGEM], [CLIENTE ENVIOU DOCUMENTO]).\nSiga cada instrução ao pé da letra, respeitando as condições descritas.\n";
     for (const k of knowledge) {
       prompt += `\n[${k.categoria.toUpperCase()}] ${k.titulo}:\n${k.conteudo}\n`;
     }
