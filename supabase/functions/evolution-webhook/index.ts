@@ -66,8 +66,15 @@ function hasActualContent(msg: any, body: any, data: any): boolean {
   return false;
 }
 
-function findBase64InPayload(obj: any, maxDepth = 3, currentPath = ""): { path: string; value: string } | null {
+function findBase64InPayload(obj: any, maxDepth = 4, currentPath = ""): { path: string; value: string } | null {
   if (!obj || typeof obj !== "object" || maxDepth <= 0) return null;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const found = findBase64InPayload(obj[i], maxDepth - 1, `${currentPath}[${i}]`);
+      if (found) return found;
+    }
+    return null;
+  }
   for (const key of Object.keys(obj)) {
     const val = obj[key];
     if (
@@ -77,7 +84,7 @@ function findBase64InPayload(obj: any, maxDepth = 3, currentPath = ""): { path: 
     ) {
       return { path: currentPath ? `${currentPath}.${key}` : key, value: val };
     }
-    if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+    if (typeof val === "object" && val !== null) {
       const found = findBase64InPayload(val, maxDepth - 1, currentPath ? `${currentPath}.${key}` : key);
       if (found) return found;
     }
@@ -171,19 +178,21 @@ async function fetchAndUploadMedia(
     );
 
     if (!response.ok) {
+      console.log(`[Webhook Media Fallback] getBase64 HTTP ${response.status} for ${messageId}`);
       return null;
     }
 
     const result = await response.json();
-    const base64Data = result.base64 || result.data;
+    const base64Data = result.base64 || result.data || result.media;
 
     if (!base64Data) {
+      console.log(`[Webhook Media Fallback] No base64 in response for ${messageId}. Keys: ${JSON.stringify(Object.keys(result))}`);
       return null;
     }
 
     return await uploadBase64ToStorage(supabase, base64Data, mimetype, conversaId, messageId);
   } catch (error) {
-    // ignored
+    console.log(`[Webhook Media Fallback] Error for ${messageId}: ${error}`);
     return null;
   }
 }
@@ -335,11 +344,20 @@ Deno.serve(async (req: Request) => {
 
       // Skip incoming messages without pushName — these are duplicate "delivered" events from Evolution API
       // that carry no sender info. The real event with pushName arrives milliseconds earlier.
+      // BUT: allow through if this is a media message with base64 data (Evolution sometimes splits media
+      // into two webhooks: first with pushName but no base64, second with base64 but no pushName)
       if (!fromMe && !isGroup && !senderName) {
-        return new Response(JSON.stringify({ skip: "no_push_name" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const hasBase64Content =
+          data?.base64 || message?.base64 || body?.base64 || body?.data?.base64 ||
+          msg?.imageMessage?.base64 || msg?.videoMessage?.base64 ||
+          msg?.audioMessage?.base64 || msg?.documentMessage?.base64 ||
+          msg?.stickerMessage?.base64;
+        if (!hasBase64Content) {
+          return new Response(JSON.stringify({ skip: "no_push_name" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
       if (!hasActualContent(msg, body, data)) {
@@ -844,7 +862,22 @@ async function processMessage(
 
   let mediaUrl: string | null = null;
   if (hasMedia && mediaMimetype) {
-    let inlineBase64 = data?.base64 || message?.base64 || body?.data?.base64 || body?.base64;
+    // Look for base64 in all possible locations within the Evolution API payload
+    let inlineBase64 =
+      msg?.imageMessage?.base64 ||
+      msg?.videoMessage?.base64 ||
+      msg?.audioMessage?.base64 ||
+      msg?.documentMessage?.base64 ||
+      msg?.stickerMessage?.base64 ||
+      data?.base64 ||
+      message?.base64 ||
+      message?.message?.imageMessage?.base64 ||
+      message?.message?.videoMessage?.base64 ||
+      message?.message?.audioMessage?.base64 ||
+      message?.message?.documentMessage?.base64 ||
+      body?.data?.base64 ||
+      body?.base64 ||
+      body?.message?.base64;
 
     if (!inlineBase64) {
       const found = findBase64InPayload(body);
@@ -855,10 +888,16 @@ async function processMessage(
 
     if (inlineBase64) {
       mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
+    } else {
+      console.log(`[Webhook Media] No inline base64 found for messageId=${messageId} tipo=${tipo}. msg keys: ${JSON.stringify(Object.keys(msg || {}))}, data keys: ${JSON.stringify(Object.keys(data || {}))}, message keys: ${JSON.stringify(Object.keys(message || {}))}`);
     }
 
     if (!mediaUrl && !fromMe) {
       mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id);
+    }
+
+    if (!mediaUrl) {
+      console.log(`[Webhook Media] Failed to get media for messageId=${messageId}, tipo=${tipo}, fallback also failed`);
     }
   }
 
@@ -868,7 +907,7 @@ async function processMessage(
   const deduplicationCutoff = new Date(Date.now() - 30000).toISOString();
   const { data: recentDupe } = await supabase
     .from("atom_connect_mensagens")
-    .select("id, message_id, status")
+    .select("id, message_id, status, media_url")
     .eq("conversa_id", conversa.id)
     .eq("from_me", fromMe)
     .eq("conteudo", conteudo)
@@ -887,6 +926,11 @@ async function processMessage(
     if (fromMe && ackVal !== undefined) {
       if ((ackVal === 3 || ackVal === "DELIVERY_ACK" || ackVal === "DELIVERED") && recentDupe.status !== "read") updateFields.status = "delivered";
       if (ackVal >= 4 || ackVal === "READ" || ackVal === "PLAYED") updateFields.status = "read";
+    }
+    // Update media_url if the duplicate arrived with base64 data (split webhook pattern)
+    if (mediaUrl && !recentDupe.media_url) {
+      updateFields.media_url = mediaUrl;
+      if (mediaMimetype) updateFields.media_mimetype = mediaMimetype;
     }
     if (Object.keys(updateFields).length > 0) {
       await supabase
