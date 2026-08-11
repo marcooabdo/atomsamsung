@@ -412,14 +412,19 @@ Deno.serve(async (req: Request) => {
                     const dlResp = await fetch(directUrl);
                     if (dlResp.ok) {
                       const arrayBuf = await dlResp.arrayBuffer();
-                      if (arrayBuf.byteLength > 0) {
-                        mediaUrl = await uploadBase64ToStorage(
-                          supabase,
-                          btoa(String.fromCharCode(...new Uint8Array(arrayBuf))),
-                          mimetype,
-                          msg.conversa_id,
-                          msg.message_id
-                        );
+                      const uint8 = new Uint8Array(arrayBuf);
+                      if (uint8.length > 100) {
+                        const ext = getExtensionFromMimetype(mimetype);
+                        const fName = `${msg.conversa_id}/${msg.message_id}.${ext}`;
+                        const { error: upErr2 } = await supabase.storage
+                          .from("atom-connect-media")
+                          .upload(fName, uint8, { contentType: mimetype, upsert: true });
+                        if (!upErr2) {
+                          const { data: { publicUrl: pu } } = supabase.storage
+                            .from("atom-connect-media")
+                            .getPublicUrl(fName);
+                          mediaUrl = pu;
+                        }
                       }
                     }
                   } catch (dlErr) {
@@ -740,7 +745,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: instancia } = await supabase
         .from("atom_connect_instancias")
-        .select("id, unidade_id, api_url, api_key, instance_name")
+        .select("id, unidade_id, api_url, api_key, instance_name, wa_business_token, phone_number_id")
         .eq("instance_name", instanceName)
         .maybeSingle();
 
@@ -970,6 +975,8 @@ async function processMessage(
     mediaMimetype = msg.imageMessage.mimetype || "image/jpeg";
     conteudo = caption || "[Imagem]";
     hasMedia = true;
+    const imgKeys = Object.keys(msg.imageMessage);
+    console.log(`[Webhook Media Debug] imageMessage keys: ${JSON.stringify(imgKeys)}, hasBase64: ${!!msg.imageMessage.base64}, base64Len: ${msg.imageMessage.base64?.length || 0}, hasUrl: ${!!msg.imageMessage.url}, hasId: ${!!msg.imageMessage.id}, hasMediaUrl: ${!!msg.imageMessage.mediaUrl}, hasDirectPath: ${!!msg.imageMessage.directPath}`);
   } else if (msg.audioMessage) {
     tipo = "audio";
     mediaMimetype = msg.audioMessage.mimetype || "audio/ogg; codecs=opus";
@@ -1238,25 +1245,84 @@ async function processMessage(
       mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id, groupInfo.rawRemoteJid || groupInfo.groupJid || undefined, fromMe);
     }
 
+    // Meta Graph API: extract mediaId from webhook payload and download directly
+    if (!mediaUrl && instancia.wa_business_token) {
+      const mediaId =
+        msg?.imageMessage?.id || msg?.videoMessage?.id || msg?.audioMessage?.id ||
+        msg?.documentMessage?.id || msg?.stickerMessage?.id ||
+        message?.message?.imageMessage?.id || message?.message?.videoMessage?.id ||
+        message?.message?.audioMessage?.id || message?.message?.documentMessage?.id ||
+        data?.mediaId || message?.mediaId || body?.data?.mediaId;
+
+      if (mediaId) {
+        console.log(`[Webhook Media] Trying Meta Graph API with mediaId=${mediaId}`);
+        try {
+          const graphResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+            headers: { Authorization: `Bearer ${instancia.wa_business_token}` },
+          });
+          if (graphResp.ok) {
+            const graphData = await graphResp.json();
+            if (graphData.url) {
+              const dlResp = await fetch(graphData.url, {
+                headers: { Authorization: `Bearer ${instancia.wa_business_token}` },
+              });
+              if (dlResp.ok) {
+                const arrayBuf = await dlResp.arrayBuffer();
+                const uint8 = new Uint8Array(arrayBuf);
+                if (uint8.length > 100) {
+                  const ext = getExtensionFromMimetype(mediaMimetype);
+                  const fileName = `${conversa.id}/${messageId}.${ext}`;
+                  const { error: upErr } = await supabase.storage
+                    .from("atom-connect-media")
+                    .upload(fileName, uint8, { contentType: mediaMimetype, upsert: true });
+                  if (!upErr) {
+                    const { data: { publicUrl } } = supabase.storage
+                      .from("atom-connect-media")
+                      .getPublicUrl(fileName);
+                    mediaUrl = publicUrl;
+                    console.log(`[Webhook Media] Meta Graph API success: ${publicUrl}`);
+                  } else {
+                    console.log(`[Webhook Media] Meta Graph API upload error: ${upErr.message}`);
+                  }
+                }
+              }
+            }
+          } else {
+            console.log(`[Webhook Media] Meta Graph API HTTP ${graphResp.status}`);
+          }
+        } catch (e) {
+          console.log(`[Webhook Media] Meta Graph API error: ${e}`);
+        }
+      } else {
+        console.log(`[Webhook Media] No mediaId found in payload for Meta Graph API. Payload media keys checked.`);
+      }
+    }
+
     if (!mediaUrl) {
-      console.log(`[Webhook Media] Failed to get media for messageId=${messageId}, tipo=${tipo}, fallback also failed`);
+      console.log(`[Webhook Media] All attempts failed for messageId=${messageId}, tipo=${tipo}`);
     }
   }
 
   // Deduplication by content: if a recent message with same conversa_id, from_me, conteudo exists
   // within last 30s, treat as duplicate. This catches Evolution API's double-fire events where
   // the second event has a different messageId (delivered/ack event) but same content.
+  // Skip content-based dedup for media messages since they all share generic content like "[Imagem]".
+  const isGenericMediaContent = ["[Imagem]", "[Video]", "[Audio]", "[Documento]", "[Sticker]", "[Figurinha]"].includes(conteudo);
   const deduplicationCutoff = new Date(Date.now() - 30000).toISOString();
-  const { data: recentDupe } = await supabase
-    .from("atom_connect_mensagens")
-    .select("id, message_id, status, media_url")
-    .eq("conversa_id", conversa.id)
-    .eq("from_me", fromMe)
-    .eq("conteudo", conteudo)
-    .gte("created_at", deduplicationCutoff)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let recentDupe: any = null;
+  if (!isGenericMediaContent) {
+    const { data } = await supabase
+      .from("atom_connect_mensagens")
+      .select("id, message_id, status, media_url")
+      .eq("conversa_id", conversa.id)
+      .eq("from_me", fromMe)
+      .eq("conteudo", conteudo)
+      .gte("created_at", deduplicationCutoff)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    recentDupe = data;
+  }
 
   if (recentDupe) {
     const updateFields: Record<string, any> = {};
