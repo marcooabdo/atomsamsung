@@ -42,6 +42,27 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const isMedia = tipo_mensagem && tipo_mensagem !== "text";
+    if (isMedia) {
+      // Debounce: wait 4s so multiple rapid attachments are batched into one GIA call
+      await new Promise(r => setTimeout(r, 4000));
+
+      // After waiting, check if there's a GIA bot response already created in the last 8s (another call already handled it)
+      const { data: recentBotMsgs } = await supabase
+        .from("atom_connect_mensagens")
+        .select("id")
+        .eq("conversa_id", conversa_id)
+        .eq("from_me", true)
+        .eq("is_bot", true)
+        .gt("created_at", new Date(Date.now() - 8000).toISOString())
+        .limit(1);
+      if (recentBotMsgs && recentBotMsgs.length > 0) {
+        return new Response(JSON.stringify({ skipped: true, reason: "debounce_already_responded" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { data: conversa } = await supabase
       .from("atom_connect_conversas")
       .select("*, instancia:atom_connect_instancias(*)")
@@ -364,6 +385,7 @@ REGRAS OBRIGATÓRIAS:
 8. Quando você NÃO conseguir resolver algo e precisar que a equipe verifique (ex: não encontrou a OS, não tem a informação solicitada), inclua [ENCAMINHAR_EQUIPE] na resposta. Isso coloca o cliente na fila de espera para um atendente verificar
 9. Formate com *negrito* para destacar informações importantes (formato WhatsApp)
 10. NUNCA inclua seu nome ou cabeçalho como "GIA - Global Intelligence Assistant:" no início da resposta. Apenas responda diretamente ao cliente. O sistema já adiciona o cabeçalho automaticamente
+11. Você NÃO consegue visualizar ou analisar imagens, fotos, vídeos ou áudios. Quando o cliente enviar qualquer mídia (fotos, vídeos, documentos, áudios), agradeça pelo envio, informe que a equipe vai analisar o material e inclua [ENCAMINHAR_EQUIPE] na resposta para que um atendente humano verifique. Nunca finja que conseguiu ver ou analisar o conteúdo da mídia
 
 PERSONALIDADE:
 - Acolhedora e paciente
@@ -483,6 +505,7 @@ INSTRUÇÃO FINAL:
 - NÃO use [TRANSFERIR_HUMANO] a menos que o cliente peça explicitamente para falar com uma pessoa
 - NÃO ofereça transferir para atendente humano. Tente resolver tudo sozinha
 - Se não souber algo ou não encontrou a OS, diga que vai encaminhar para a equipe verificar e inclua [ENCAMINHAR_EQUIPE] na resposta
+- Se o cliente enviou foto, vídeo, documento ou áudio, agradeça e diga que a equipe vai analisar. Inclua [ENCAMINHAR_EQUIPE]. NUNCA diga que você viu ou analisou a mídia
 - Lembre-se: você está em um chat WhatsApp, mantenha mensagens curtas e naturais`;
 
   return prompt;
