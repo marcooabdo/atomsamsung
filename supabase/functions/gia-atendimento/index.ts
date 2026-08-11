@@ -233,10 +233,11 @@ Deno.serve(async (req: Request) => {
     const tokensUsed = openaiData.usage?.total_tokens || 0;
 
     const shouldEscalate = rawResponse.includes("[TRANSFERIR_HUMANO]");
-    const cleanResponse = rawResponse.replace(/\[TRANSFERIR_HUMANO\]/g, "").trim();
+    const shouldQueue = rawResponse.includes("[ENCAMINHAR_EQUIPE]");
+    const cleanResponse = rawResponse.replace(/\[TRANSFERIR_HUMANO\]/g, "").replace(/\[ENCAMINHAR_EQUIPE\]/g, "").trim();
 
     if (shouldEscalate || !cleanResponse) {
-      await escalateToHuman(supabase, conversa, rawResponse.includes("[TRANSFERIR_HUMANO]") ? "GIA decidiu transferir para humano" : "Resposta vazia da IA");
+      await escalateToHuman(supabase, conversa, shouldEscalate ? "Cliente pediu atendente humano" : "Resposta vazia da IA");
 
       if (cleanResponse) {
         await sendWhatsAppMessage(supabase, conversa, cleanResponse);
@@ -247,6 +248,14 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ escalated: true, response: cleanResponse }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (shouldQueue) {
+      await supabase
+        .from("atom_connect_conversas")
+        .update({ coluna_pipeline: "fila_espera" })
+        .eq("id", conversa.id);
+      console.log(`[GIA Atendimento] Conversa ${conversa.id} movida para fila_espera - GIA encaminhou para equipe`);
     }
 
     await sendWhatsAppMessage(supabase, conversa, cleanResponse);
@@ -284,7 +293,8 @@ REGRAS OBRIGATÓRIAS:
 5. Mantenha respostas concisas (máximo 3-4 parágrafos)
 6. APENAS inclua [TRANSFERIR_HUMANO] quando o cliente EXPLICITAMENTE pedir para falar com um atendente/pessoa/humano, ou quando ficar muito agressivo. NÃO ofereça transferir para humano por conta própria — tente resolver a questão primeiro
 7. NÃO mencione a possibilidade de transferir para atendente humano a menos que o cliente peça. Resolva você mesma o máximo possível
-8. Formate com *negrito* para destacar informações importantes (formato WhatsApp)
+8. Quando você NÃO conseguir resolver algo e precisar que a equipe verifique (ex: não encontrou a OS, não tem a informação solicitada), inclua [ENCAMINHAR_EQUIPE] na resposta. Isso coloca o cliente na fila de espera para um atendente verificar
+9. Formate com *negrito* para destacar informações importantes (formato WhatsApp)
 
 PERSONALIDADE:
 - Acolhedora e paciente
@@ -383,7 +393,7 @@ INSTRUÇÃO FINAL:
 - Se quiser aprovar orçamento e tiver link, envie o link
 - NÃO use [TRANSFERIR_HUMANO] a menos que o cliente peça explicitamente para falar com uma pessoa
 - NÃO ofereça transferir para atendente humano. Tente resolver tudo sozinha
-- Se não souber algo, diga que vai verificar com a equipe, mas NÃO transfira automaticamente
+- Se não souber algo ou não encontrou a OS, diga que vai encaminhar para a equipe verificar e inclua [ENCAMINHAR_EQUIPE] na resposta
 - Lembre-se: você está em um chat WhatsApp, mantenha mensagens curtas e naturais`;
 
   return prompt;
