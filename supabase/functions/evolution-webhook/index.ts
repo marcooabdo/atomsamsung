@@ -225,15 +225,83 @@ Deno.serve(async (req: Request) => {
     const data = body.data || body;
     const instance = body.instance || body.instanceName || data?.instance || body.sender?.instance;
 
-    const isStatusEvent = event.includes("messages.update") || event === "message.update" || event.includes("message.ack") || event.includes("message.status") || event.includes("messages.status");
+    function parseStatusValue(rawStatus: any): string {
+      if (rawStatus === undefined || rawStatus === null) return "";
+      if (typeof rawStatus === "number") {
+        if (rawStatus === 0 || rawStatus === 1) return "pending";
+        if (rawStatus === 2) return "sent";
+        if (rawStatus === 3) return "delivered";
+        if (rawStatus >= 4) return "read";
+      } else if (typeof rawStatus === "string") {
+        const upper = rawStatus.toUpperCase();
+        if (upper === "PENDING" || upper === "0" || upper === "1") return "pending";
+        if (upper === "ERROR" || upper === "FAILED") return "failed";
+        if (upper === "SERVER_ACK" || upper === "SENT" || upper === "2") return "sent";
+        if (upper === "DELIVERY_ACK" || upper === "DELIVERED" || upper === "3") return "delivered";
+        if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED" || upper === "4" || upper === "5") return "read";
+      }
+      return "";
+    }
+
+    async function applyStatusUpdate(msgId: string, newStatus: string) {
+      if (!msgId || !newStatus) return;
+
+      // Only upgrade status, never downgrade (pending < sent < delivered < read)
+      const statusOrder: Record<string, number> = { pending: 0, failed: 0, sent: 1, delivered: 2, read: 3 };
+      const newOrder = statusOrder[newStatus] ?? 0;
+
+      // Build condition to avoid downgrade
+      const downgradeGuard = newOrder > 0
+        ? ["pending", "sent", "delivered", "read"].filter(s => (statusOrder[s] ?? 0) < newOrder)
+        : undefined;
+
+      let query = supabase
+        .from("atom_connect_mensagens")
+        .update({ status: newStatus })
+        .eq("message_id", msgId);
+
+      if (downgradeGuard && downgradeGuard.length > 0 && newStatus !== "failed") {
+        query = query.in("status", downgradeGuard);
+      }
+
+      const { data: result, error } = await query.select("id, conversa_id");
+
+      console.log(`[Webhook Status] Updated messageId=${msgId} to ${newStatus}, matched=${result?.length || 0}, error=${error?.message || 'none'}`);
+
+      if (!error && result && result.length > 0 && newStatus === "failed") {
+        await supabase
+          .from("atom_connect_conversas")
+          .update({ janela_fechada_forcada: true })
+          .eq("id", result[0].conversa_id);
+      }
+    }
+
+    const isStatusEvent = event.includes("messages.update") || event === "message.update" || event.includes("message.ack") || event.includes("message.status") || event.includes("messages.status") || event === "status" || event.includes("msg.update") || event.includes("message.delivery");
     if (isStatusEvent) {
+      console.log(`[Webhook Status] Processing status event=${rawEvent} bodyKeys=${JSON.stringify(Object.keys(body))}`);
+
       const rawUpdates = body.data ?? body;
       const updates = Array.isArray(rawUpdates) ? rawUpdates : [rawUpdates];
 
+      // Handle Meta Cloud API native statuses format
       for (const update of updates) {
+        const statuses = update?.entry?.[0]?.changes?.[0]?.value?.statuses
+          || update?.statuses
+          || update?.value?.statuses;
+
+        if (statuses && Array.isArray(statuses)) {
+          for (const s of statuses) {
+            const msgId = s.id || s.message_id || "";
+            const newStatus = parseStatusValue(s.status);
+            await applyStatusUpdate(msgId, newStatus);
+          }
+          continue;
+        }
+
         const messageId =
           update.key?.id ||
           update.keyId ||
+          update.id?.id ||
           update.id ||
           update.messageId ||
           update.message?.key?.id ||
@@ -248,45 +316,8 @@ Deno.serve(async (req: Request) => {
 
         console.log(`[Webhook Status] event=${rawEvent} messageId=${messageId} rawStatus=${rawStatus} updateKeys=${JSON.stringify(Object.keys(update))}`);
 
-        if (!messageId) {
-          continue;
-        }
-
-        if (rawStatus === undefined || rawStatus === null) {
-          continue;
-        }
-
-        let newStatus = "sent";
-
-        if (typeof rawStatus === "number") {
-          if (rawStatus === 0 || rawStatus === 1) newStatus = "pending";
-          else if (rawStatus === 2) newStatus = "sent";
-          else if (rawStatus === 3) newStatus = "delivered";
-          else if (rawStatus >= 4) newStatus = "read";
-        } else if (typeof rawStatus === "string") {
-          const upper = rawStatus.toUpperCase();
-          if (upper === "PENDING" || upper === "0" || upper === "1") newStatus = "pending";
-          else if (upper === "ERROR" || upper === "FAILED") newStatus = "failed";
-          else if (upper === "SERVER_ACK" || upper === "SENT" || upper === "2") newStatus = "sent";
-          else if (upper === "DELIVERY_ACK" || upper === "DELIVERED" || upper === "3") newStatus = "delivered";
-          else if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED" || upper === "4" || upper === "5") newStatus = "read";
-        }
-
-        const { data: result, error } = await supabase
-          .from("atom_connect_mensagens")
-          .update({ status: newStatus })
-          .eq("message_id", messageId)
-          .select("id, conversa_id");
-
-        console.log(`[Webhook Status] Updated messageId=${messageId} to ${newStatus}, matched=${result?.length || 0}, error=${error?.message || 'none'}`);
-
-        // When a message fails, force the 24h window closed on the conversation
-        if (!error && result && result.length > 0 && newStatus === "failed") {
-          await supabase
-            .from("atom_connect_conversas")
-            .update({ janela_fechada_forcada: true })
-            .eq("id", result[0].conversa_id);
-        }
+        const newStatus = parseStatusValue(rawStatus);
+        await applyStatusUpdate(messageId, newStatus);
       }
 
       return new Response(JSON.stringify({ success: true, type: "status_update" }), {
@@ -346,13 +377,15 @@ Deno.serve(async (req: Request) => {
       // that carry no sender info. The real event with pushName arrives milliseconds earlier.
       // BUT: allow through if this is a media message with base64 data (Evolution sometimes splits media
       // into two webhooks: first with pushName but no base64, second with base64 but no pushName)
+      // Also allow through if this has ack/status data (it's a status update disguised as upsert)
       if (!fromMe && !isGroup && !senderName) {
         const hasBase64Content =
           data?.base64 || message?.base64 || body?.base64 || body?.data?.base64 ||
           msg?.imageMessage?.base64 || msg?.videoMessage?.base64 ||
           msg?.audioMessage?.base64 || msg?.documentMessage?.base64 ||
           msg?.stickerMessage?.base64;
-        if (!hasBase64Content) {
+        const hasAckData = data?.ack !== undefined || message?.ack !== undefined || body?.ack !== undefined || data?.status !== undefined || message?.status !== undefined;
+        if (!hasBase64Content && !hasAckData) {
           return new Response(JSON.stringify({ skip: "no_push_name" }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -362,24 +395,11 @@ Deno.serve(async (req: Request) => {
 
       if (!hasActualContent(msg, body, data)) {
         // Check if this is a status update disguised as messages.upsert (common with Meta Cloud API)
-        const ack = data?.ack ?? message?.ack ?? body?.ack ?? data?.status ?? message?.status;
-        if (fromMe && messageId && ack !== undefined && ack !== null) {
-          let statusFromAck = "sent";
-          if (typeof ack === "number") {
-            if (ack === 3) statusFromAck = "delivered";
-            else if (ack >= 4) statusFromAck = "read";
-            else if (ack === 2) statusFromAck = "sent";
-          } else if (typeof ack === "string") {
-            const upper = ack.toUpperCase();
-            if (upper === "DELIVERY_ACK" || upper === "DELIVERED" || upper === "3") statusFromAck = "delivered";
-            else if (upper === "READ" || upper === "PLAYED" || upper === "4" || upper === "5") statusFromAck = "read";
-          }
-          if (statusFromAck !== "sent") {
-            await supabase
-              .from("atom_connect_mensagens")
-              .update({ status: statusFromAck })
-              .eq("message_id", messageId);
-            console.log(`[Webhook] Status update via upsert: messageId=${messageId} status=${statusFromAck}`);
+        const ack = data?.ack ?? message?.ack ?? body?.ack ?? data?.status ?? message?.status ?? data?.update?.status ?? data?.update?.ack;
+        if (messageId && ack !== undefined && ack !== null) {
+          const statusFromAck = parseStatusValue(ack);
+          if (statusFromAck && statusFromAck !== "sent") {
+            await applyStatusUpdate(messageId, statusFromAck);
           }
           return new Response(JSON.stringify({ success: true, type: "status_via_upsert" }), {
             status: 200,
@@ -922,10 +942,13 @@ async function processMessage(
     if (fromMe && recentDupe.status === "pending") updateFields.status = "sent";
     if (!fromMe && recentDupe.status !== "delivered") updateFields.status = "delivered";
     // Upgrade status if ack info is available
-    const ackVal = data?.ack ?? message?.ack ?? data?.status;
-    if (fromMe && ackVal !== undefined) {
-      if ((ackVal === 3 || ackVal === "DELIVERY_ACK" || ackVal === "DELIVERED") && recentDupe.status !== "read") updateFields.status = "delivered";
-      if (ackVal >= 4 || ackVal === "READ" || ackVal === "PLAYED") updateFields.status = "read";
+    const ackVal = data?.ack ?? message?.ack ?? data?.status ?? data?.update?.status;
+    if (ackVal !== undefined) {
+      const parsedStatus = parseStatusValue(ackVal);
+      const statusOrder: Record<string, number> = { pending: 0, sent: 1, delivered: 2, read: 3 };
+      const currentOrder = statusOrder[recentDupe.status] ?? 0;
+      const newOrder = statusOrder[parsedStatus] ?? 0;
+      if (parsedStatus && newOrder > currentOrder) updateFields.status = parsedStatus;
     }
     // Update media_url if the duplicate arrived with base64 data (split webhook pattern)
     if (mediaUrl && !recentDupe.media_url) {
