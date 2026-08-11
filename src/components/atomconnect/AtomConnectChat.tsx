@@ -186,6 +186,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [groupMembers, setGroupMembers] = useState<{ phone: string; name: string | null; role: string; foto_url: string | null }[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
   const [metaTemplates, setMetaTemplates] = useState<MetaTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [sendingTemplate, setSendingTemplate] = useState<string | null>(null);
@@ -1594,7 +1595,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       );
       if (res.ok) {
         const data = await res.json();
-        setMetaTemplates(data.templates || []);
+        setMetaTemplates((data.templates || []).filter((t: MetaTemplate) => t.name !== 'hello_world'));
       }
     } catch { /* ignore */ }
     setLoadingTemplates(false);
@@ -1636,7 +1637,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           ultima_mensagem: templateText.substring(0, 200),
           ultima_mensagem_at: new Date().toISOString(),
         }).eq('id', conversa.id);
-        setShowTemplateModal(false);
+        setShowTemplateModal(false); setTemplateSearch('');
       } else {
         console.error('Template send failed:', data);
       }
@@ -3239,7 +3240,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[70] flex items-center justify-center p-4"
             style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-            onClick={() => setShowTemplateModal(false)}
+            onClick={() => { setShowTemplateModal(false); setTemplateSearch(''); }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -3259,10 +3260,31 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     <p className="text-xs" style={{ color: textSecondary }}>Selecione um template para reabrir a conversa</p>
                   </div>
                 </div>
-                <button onClick={() => setShowTemplateModal(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                <button onClick={() => { setShowTemplateModal(false); setTemplateSearch(''); }} className="p-1.5 rounded-lg hover:bg-white/10">
                   <X className="w-4 h-4" style={{ color: textSecondary }} />
                 </button>
               </div>
+
+              {!loadingTemplates && metaTemplates.length > 0 && (
+                <div className="px-4 pt-3 pb-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: textSecondary }} />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar template..."
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg outline-none"
+                      style={{
+                        background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        border: `1px solid ${borderColor}`,
+                        color: textPrimary,
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {loadingTemplates ? (
@@ -3279,7 +3301,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     </p>
                   </div>
                 ) : (
-                  metaTemplates.map((template) => {
+                  metaTemplates.filter((t) => {
+                    if (!templateSearch.trim()) return true;
+                    const search = templateSearch.toLowerCase();
+                    const name = t.name.replace(/_/g, ' ').toLowerCase();
+                    const bodyComp = t.components.find((c) => c.type === 'BODY');
+                    const bodyText = (bodyComp?.text || '').toLowerCase();
+                    return name.includes(search) || bodyText.includes(search) || t.category.toLowerCase().includes(search);
+                  }).map((template) => {
                     const bodyComp = template.components.find((c) => c.type === 'BODY');
                     const headerComp = template.components.find((c) => c.type === 'HEADER');
                     const buttonsComp = template.components.find((c) => c.type === 'BUTTONS');
