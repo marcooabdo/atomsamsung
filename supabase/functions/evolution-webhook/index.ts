@@ -216,7 +216,8 @@ Deno.serve(async (req: Request) => {
     const data = body.data || body;
     const instance = body.instance || body.instanceName || data?.instance || body.sender?.instance;
 
-    if (event.includes("messages.update") || event === "message.update" || event.includes("message.ack")) {
+    const isStatusEvent = event.includes("messages.update") || event === "message.update" || event.includes("message.ack") || event.includes("message.status") || event.includes("messages.status");
+    if (isStatusEvent) {
       const rawUpdates = body.data ?? body;
       const updates = Array.isArray(rawUpdates) ? rawUpdates : [rawUpdates];
 
@@ -233,7 +234,10 @@ Deno.serve(async (req: Request) => {
           update.update?.status ??
           update.status ??
           update.ack ??
-          update.message?.status;
+          update.message?.status ??
+          update.update?.ack;
+
+        console.log(`[Webhook Status] event=${rawEvent} messageId=${messageId} rawStatus=${rawStatus} updateKeys=${JSON.stringify(Object.keys(update))}`);
 
         if (!messageId) {
           continue;
@@ -264,6 +268,8 @@ Deno.serve(async (req: Request) => {
           .update({ status: newStatus })
           .eq("message_id", messageId)
           .select("id, conversa_id");
+
+        console.log(`[Webhook Status] Updated messageId=${messageId} to ${newStatus}, matched=${result?.length || 0}, error=${error?.message || 'none'}`);
 
         // When a message fails, force the 24h window closed on the conversation
         if (!error && result && result.length > 0 && newStatus === "failed") {
@@ -337,6 +343,31 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!hasActualContent(msg, body, data)) {
+        // Check if this is a status update disguised as messages.upsert (common with Meta Cloud API)
+        const ack = data?.ack ?? message?.ack ?? body?.ack ?? data?.status ?? message?.status;
+        if (fromMe && messageId && ack !== undefined && ack !== null) {
+          let statusFromAck = "sent";
+          if (typeof ack === "number") {
+            if (ack === 3) statusFromAck = "delivered";
+            else if (ack >= 4) statusFromAck = "read";
+            else if (ack === 2) statusFromAck = "sent";
+          } else if (typeof ack === "string") {
+            const upper = ack.toUpperCase();
+            if (upper === "DELIVERY_ACK" || upper === "DELIVERED" || upper === "3") statusFromAck = "delivered";
+            else if (upper === "READ" || upper === "PLAYED" || upper === "4" || upper === "5") statusFromAck = "read";
+          }
+          if (statusFromAck !== "sent") {
+            await supabase
+              .from("atom_connect_mensagens")
+              .update({ status: statusFromAck })
+              .eq("message_id", messageId);
+            console.log(`[Webhook] Status update via upsert: messageId=${messageId} status=${statusFromAck}`);
+          }
+          return new Response(JSON.stringify({ success: true, type: "status_via_upsert" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ skip: "no_content" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -847,11 +878,16 @@ async function processMessage(
     .maybeSingle();
 
   if (recentDupe) {
-    // If existing row has no message_id yet, link the real one and update status
     const updateFields: Record<string, any> = {};
     if (!recentDupe.message_id && messageId) updateFields.message_id = messageId;
     if (fromMe && recentDupe.status === "pending") updateFields.status = "sent";
     if (!fromMe && recentDupe.status !== "delivered") updateFields.status = "delivered";
+    // Upgrade status if ack info is available
+    const ackVal = data?.ack ?? message?.ack ?? data?.status;
+    if (fromMe && ackVal !== undefined) {
+      if ((ackVal === 3 || ackVal === "DELIVERY_ACK" || ackVal === "DELIVERED") && recentDupe.status !== "read") updateFields.status = "delivered";
+      if (ackVal >= 4 || ackVal === "READ" || ackVal === "PLAYED") updateFields.status = "read";
+    }
     if (Object.keys(updateFields).length > 0) {
       await supabase
         .from("atom_connect_mensagens")

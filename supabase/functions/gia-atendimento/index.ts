@@ -523,6 +523,7 @@ async function sendWhatsAppMessage(supabase: any, conversa: any, rawText: string
 
   const phoneForSend = phone.startsWith("55") ? phone : `55${phone}`;
 
+  let realMessageId = `gia_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   try {
     const resp = await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
       method: "POST",
@@ -532,6 +533,10 @@ async function sendWhatsAppMessage(supabase: any, conversa: any, rawText: string
 
     if (!resp.ok) {
       console.error("[GIA Atendimento] sendText failed:", resp.status, await resp.text());
+    } else {
+      const result = await resp.json();
+      const wamid = result?.key?.id || result?.messageId;
+      if (wamid) realMessageId = wamid;
     }
   } catch (err) {
     console.error("[GIA Atendimento] sendText error:", err);
@@ -539,7 +544,7 @@ async function sendWhatsAppMessage(supabase: any, conversa: any, rawText: string
 
   await supabase.from("atom_connect_mensagens").insert({
     conversa_id: conversa.id,
-    message_id: `gia_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    message_id: realMessageId,
     from_me: true,
     tipo: "text",
     conteudo: text,
