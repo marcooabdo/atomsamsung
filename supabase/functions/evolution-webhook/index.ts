@@ -158,6 +158,44 @@ async function uploadBase64ToStorage(
   }
 }
 
+async function uploadBase64ToStorage(
+  supabase: any,
+  base64Data: string,
+  mimetype: string,
+  conversaId: string,
+  messageId: string
+): Promise<string | null> {
+  try {
+    const clean = base64Data.replace(/^data:[^;]+;base64,/, "");
+    const binary = atob(clean);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    if (bytes.length < 100) return null;
+
+    const ext = getExtensionFromMimetype(mimetype);
+    const fileName = `${conversaId}/${messageId}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("atom-connect-media")
+      .upload(fileName, bytes, { contentType: mimetype, upsert: true });
+
+    if (upErr) {
+      console.log(`[Upload Base64] Error: ${upErr.message}`);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("atom-connect-media")
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  } catch (e) {
+    console.log(`[Upload Base64] Exception: ${e}`);
+    return null;
+  }
+}
+
 async function fetchAndUploadMedia(
   supabase: any,
   instancia: { api_url: string; api_key: string; instance_name: string },
@@ -275,7 +313,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: inst } = await supabase
         .from("atom_connect_instancias")
-        .select("api_url, api_key, instance_name")
+        .select("api_url, api_key, instance_name, wa_business_token")
         .eq("id", conv.instancia_id)
         .single();
 
@@ -293,17 +331,171 @@ Deno.serve(async (req: Request) => {
           : undefined;
 
       const mimetype = msg.media_mimetype || "application/octet-stream";
+      console.log(`[Retry Media] msgId=${msg.message_id} conversaId=${msg.conversa_id} remoteJid=${remoteJid} fromMe=${msg.from_me} mimetype=${mimetype} inst=${inst.instance_name} apiUrl=${inst.api_url}`);
+
       let mediaUrl: string | null = null;
 
-      mediaUrl = await fetchAndUploadMedia(
-        supabase,
-        inst,
-        msg.message_id,
-        mimetype,
-        msg.conversa_id,
-        remoteJid,
-        msg.from_me
-      );
+      // Attempt 1: findMessages to get full message, then getBase64 with full message body
+      if (remoteJid) {
+        try {
+          console.log(`[Retry Media] Attempt 1: findMessages for ${msg.message_id}`);
+          const findResp = await fetch(
+            `${inst.api_url}/chat/findMessages/${inst.instance_name}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: inst.api_key,
+              },
+              body: JSON.stringify({
+                where: {
+                  key: {
+                    id: msg.message_id,
+                    remoteJid,
+                    fromMe: msg.from_me ?? false,
+                  },
+                },
+                limit: 1,
+              }),
+            }
+          );
+          if (findResp.ok) {
+            const findResult = await findResp.json();
+            const results = Array.isArray(findResult) ? findResult : findResult?.messages || [];
+            const found = results[0];
+            console.log(`[Retry Media] findMessages found: ${!!found}, keys: ${found ? JSON.stringify(Object.keys(found)) : 'none'}`);
+
+            if (found) {
+              // Try getBase64 with the full found message
+              try {
+                const b64Resp = await fetch(
+                  `${inst.api_url}/chat/getBase64FromMediaMessage/${inst.instance_name}`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", apikey: inst.api_key },
+                    body: JSON.stringify({
+                      message: found,
+                      convertToMp4: false,
+                    }),
+                  }
+                );
+                if (b64Resp.ok) {
+                  const b64Result = await b64Resp.json();
+                  const base64Data = b64Result.base64 || b64Result.data || b64Result.media;
+                  console.log(`[Retry Media] getBase64 with full message: hasData=${!!base64Data}, len=${base64Data?.length || 0}`);
+                  if (base64Data) {
+                    mediaUrl = await uploadBase64ToStorage(supabase, base64Data, mimetype, msg.conversa_id, msg.message_id);
+                  }
+                } else {
+                  console.log(`[Retry Media] getBase64 with full message HTTP ${b64Resp.status}`);
+                }
+              } catch (e) {
+                console.log(`[Retry Media] getBase64 with full message error: ${e}`);
+              }
+
+              // If getBase64 failed, try direct URL from message content
+              if (!mediaUrl) {
+                const msgContent = found.message || {};
+                const mediaTypes = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage"];
+                let directUrl: string | null = null;
+
+                for (const mt of mediaTypes) {
+                  if (msgContent[mt]?.url) {
+                    directUrl = msgContent[mt].url;
+                    break;
+                  }
+                }
+
+                if (directUrl) {
+                  console.log(`[Retry Media] Trying directUrl download...`);
+                  try {
+                    const dlResp = await fetch(directUrl);
+                    if (dlResp.ok) {
+                      const arrayBuf = await dlResp.arrayBuffer();
+                      if (arrayBuf.byteLength > 0) {
+                        mediaUrl = await uploadBase64ToStorage(
+                          supabase,
+                          btoa(String.fromCharCode(...new Uint8Array(arrayBuf))),
+                          mimetype,
+                          msg.conversa_id,
+                          msg.message_id
+                        );
+                      }
+                    }
+                  } catch (dlErr) {
+                    console.log(`[Retry Media] directUrl download error: ${dlErr}`);
+                  }
+                }
+              }
+            }
+          } else {
+            console.log(`[Retry Media] findMessages HTTP ${findResp.status}`);
+          }
+        } catch (e) {
+          console.log(`[Retry Media] findMessages error: ${e}`);
+        }
+      }
+
+      // Attempt 2: simple key-based getBase64 (original approach)
+      if (!mediaUrl) {
+        console.log(`[Retry Media] Attempt 2: key-based getBase64`);
+        mediaUrl = await fetchAndUploadMedia(
+          supabase,
+          inst,
+          msg.message_id,
+          mimetype,
+          msg.conversa_id,
+          remoteJid,
+          msg.from_me
+        );
+      }
+
+      // Attempt 3: Meta Graph API direct download (for Cloud API instances)
+      if (!mediaUrl && inst.wa_business_token) {
+        try {
+          console.log(`[Retry Media] Attempt 3: Meta Graph API`);
+          // The wamid message_id can sometimes be used as media_id with the Graph API
+          // First try to get media URL from the Graph API
+          const graphResp = await fetch(
+            `https://graph.facebook.com/v21.0/${msg.message_id}`,
+            {
+              headers: { Authorization: `Bearer ${inst.wa_business_token}` },
+            }
+          );
+          if (graphResp.ok) {
+            const graphData = await graphResp.json();
+            if (graphData.url) {
+              const dlResp = await fetch(graphData.url, {
+                headers: { Authorization: `Bearer ${inst.wa_business_token}` },
+              });
+              if (dlResp.ok) {
+                const arrayBuf = await dlResp.arrayBuffer();
+                if (arrayBuf.byteLength > 0) {
+                  const ext = getExtensionFromMimetype(mimetype);
+                  const fileName = `${msg.conversa_id}/${msg.message_id}.${ext}`;
+                  const { error: upErr } = await supabase.storage
+                    .from("atom-connect-media")
+                    .upload(fileName, new Uint8Array(arrayBuf), {
+                      contentType: mimetype,
+                      upsert: true,
+                    });
+                  if (!upErr) {
+                    const { data: { publicUrl } } = supabase.storage
+                      .from("atom-connect-media")
+                      .getPublicUrl(fileName);
+                    mediaUrl = publicUrl;
+                    console.log(`[Retry Media] Meta Graph API success: ${publicUrl}`);
+                  }
+                }
+              }
+            }
+          } else {
+            console.log(`[Retry Media] Meta Graph API HTTP ${graphResp.status}`);
+          }
+        } catch (e) {
+          console.log(`[Retry Media] Meta Graph API error: ${e}`);
+        }
+      }
 
       if (mediaUrl) {
         await supabase
@@ -312,8 +504,9 @@ Deno.serve(async (req: Request) => {
           .eq("id", msg.id);
       }
 
+      console.log(`[Retry Media] Result: ${mediaUrl ? 'SUCCESS' : 'FAILED'}`);
       return new Response(
-        JSON.stringify(mediaUrl ? { media_url: mediaUrl } : { error: "Não foi possível baixar a mídia" }),
+        JSON.stringify(mediaUrl ? { media_url: mediaUrl } : { error: "Não foi possível baixar a mídia. A mídia pode ter expirado no WhatsApp." }),
         {
           status: mediaUrl ? 200 : 422,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
