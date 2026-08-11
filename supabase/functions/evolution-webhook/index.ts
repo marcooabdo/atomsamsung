@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+// v3: clean deploy
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,6 +112,31 @@ function getExtensionFromMimetype(mimetype: string): string {
   return mimeMap[mimetype] || "bin";
 }
 
+function base64ToUint8Array(b64: string): Uint8Array {
+  const lookup = new Uint8Array(256);
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+  
+  let padding = 0;
+  if (b64.endsWith("==")) padding = 2;
+  else if (b64.endsWith("=")) padding = 1;
+  
+  const len = (b64.length * 3) / 4 - padding;
+  const bytes = new Uint8Array(len);
+  let p = 0;
+  
+  for (let i = 0; i < b64.length; i += 4) {
+    const a = lookup[b64.charCodeAt(i)];
+    const b = lookup[b64.charCodeAt(i + 1)];
+    const c = lookup[b64.charCodeAt(i + 2)];
+    const d = lookup[b64.charCodeAt(i + 3)];
+    if (p < len) bytes[p++] = (a << 2) | (b >> 4);
+    if (p < len) bytes[p++] = ((b & 15) << 4) | (c >> 2);
+    if (p < len) bytes[p++] = ((c & 3) << 6) | d;
+  }
+  return bytes;
+}
+
 async function uploadBase64ToStorage(
   supabase: any,
   base64Data: string,
@@ -119,15 +145,16 @@ async function uploadBase64ToStorage(
   messageId: string
 ): Promise<string | null> {
   try {
-    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
+    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "").replace(/[\r\n\s]/g, "");
     if (!cleanBase64 || cleanBase64.length < 100) {
       console.log(`[Upload Media] base64 too short (${cleanBase64?.length || 0} chars) for ${messageId}`);
       return null;
     }
 
-    const binaryData = Uint8Array.from(atob(cleanBase64), (c) => c.charCodeAt(0));
-    if (binaryData.length === 0) {
-      console.log(`[Upload Media] Empty binary for ${messageId}`);
+    console.log(`[Upload Media] Decoding base64 for ${messageId}, length=${cleanBase64.length}`);
+    const binaryData = base64ToUint8Array(cleanBase64);
+    if (binaryData.length < 100) {
+      console.log(`[Upload Media] Binary too small (${binaryData.length} bytes) for ${messageId}`);
       return null;
     }
 
@@ -1015,6 +1042,8 @@ async function processMessage(
       message?.message?.imageMessage?.url || message?.message?.videoMessage?.url ||
       message?.message?.audioMessage?.url || message?.message?.documentMessage?.url;
 
+
+
     if (inlineBase64) {
       mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
     } else if (directMediaUrl && (directMediaUrl.startsWith('http://') || directMediaUrl.startsWith('https://'))) {
@@ -1023,14 +1052,21 @@ async function processMessage(
         if (mediaResp.ok) {
           const arrayBuf = await mediaResp.arrayBuffer();
           const uint8 = new Uint8Array(arrayBuf);
-          if (uint8.length > 0) {
-            let binary = '';
-            const chunkSize = 8192;
-            for (let i = 0; i < uint8.length; i += chunkSize) {
-              binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+          if (uint8.length > 100) {
+            const ext = getExtensionFromMimetype(mediaMimetype);
+            const fileName = `${conversa.id}/${messageId}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from("atom-connect-media")
+              .upload(fileName, uint8, { contentType: mediaMimetype, upsert: true });
+            if (!upErr) {
+              const { data: { publicUrl } } = supabase.storage
+                .from("atom-connect-media")
+                .getPublicUrl(fileName);
+              mediaUrl = publicUrl;
+              console.log(`[Webhook Media] Direct URL upload success: ${publicUrl}`);
+            } else {
+              console.log(`[Webhook Media] Direct URL upload error: ${upErr.message}`);
             }
-            const b64 = btoa(binary);
-            mediaUrl = await uploadBase64ToStorage(supabase, b64, mediaMimetype, conversa.id, messageId);
           }
         }
         if (!mediaUrl) console.log(`[Webhook Media] Direct URL download failed for ${messageId}: HTTP ${mediaResp?.status}`);
@@ -2316,3 +2352,4 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     try { await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Erro ao processar comando de rota. Tente novamente.`); } catch {}
   }
 }
+.
