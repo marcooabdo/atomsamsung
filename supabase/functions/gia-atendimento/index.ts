@@ -123,6 +123,33 @@ Deno.serve(async (req: Request) => {
       if (osByPhone) osVinculada = osByPhone;
     }
 
+    // If still no OS found, try to extract an OS number from the client's message or recent history
+    if (!osVinculada) {
+      const textsToSearch = [mensagem_cliente, ...(history || []).filter((m: any) => !m.from_me).slice(-3).map((m: any) => m.conteudo || "")];
+      const allText = textsToSearch.join(" ");
+      // Match numeric sequences that look like OS numbers (7-13 digits)
+      const osNumberMatch = allText.match(/\b(\d{7,13})\b/);
+      if (osNumberMatch) {
+        const osNumber = osNumberMatch[1];
+        const { data: osByNumber } = await supabase
+          .from("os")
+          .select(`
+            *,
+            unidade:unidades!os_unidade_id_fkey(nome),
+            tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome),
+            tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome),
+            os_pecas:os_pecas(pn, descricao, quantidade, valor_unitario, status_gspn),
+            pagamentos:pagamentos(forma_pagamento, valor, created_at)
+          `)
+          .or(`numero_os_samsung.eq.${osNumber},numero_os_interna.eq.${osNumber}`)
+          .neq("arquivada", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (osByNumber) osVinculada = osByNumber;
+      }
+    }
+
     const allKnowledge = (knowledgeResult.data || []).filter((k: any) => {
       if (!k) return false;
       return true;
@@ -248,11 +275,11 @@ function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLi
 REGRAS OBRIGATÓRIAS:
 1. Seja sempre educada, profissional e empática
 2. Use português brasileiro natural, sem exagero de emojis (máximo 1-2 por mensagem)
-3. Nunca invente informações — se não souber algo, diga que vai verificar e inclua [TRANSFERIR_HUMANO] na resposta
+3. Nunca invente informações — se não souber algo, diga que não tem essa informação no momento e que vai encaminhar para a equipe verificar
 4. Nunca revele que é uma IA, se perguntar diga que é a GIA, assistente do atendimento
 5. Mantenha respostas concisas (máximo 3-4 parágrafos)
-6. Se o cliente ficar agressivo ou solicitar falar com um humano, inclua [TRANSFERIR_HUMANO] na resposta (envie uma mensagem cordial antes de transferir)
-7. Se precisar de informação que não tem, inclua [TRANSFERIR_HUMANO]
+6. APENAS inclua [TRANSFERIR_HUMANO] quando o cliente EXPLICITAMENTE pedir para falar com um atendente/pessoa/humano, ou quando ficar muito agressivo. NÃO ofereça transferir para humano por conta própria — tente resolver a questão primeiro
+7. NÃO mencione a possibilidade de transferir para atendente humano a menos que o cliente peça. Resolva você mesma o máximo possível
 8. Formate com *negrito* para destacar informações importantes (formato WhatsApp)
 
 PERSONALIDADE:
@@ -334,7 +361,7 @@ Diga algo como: "Preparei o link do orçamento para sua aprovação: ${orcamento
 `;
     }
   } else {
-    prompt += `\nNENHUMA OS VINCULADA: Não encontrei uma ordem de serviço vinculada a este número. Se o cliente perguntar sobre um serviço específico, peça o número da OS ou pergunte mais detalhes e inclua [TRANSFERIR_HUMANO] para que um atendente vincule manualmente.\n`;
+    prompt += `\nNENHUMA OS VINCULADA: Não encontrei uma ordem de serviço vinculada a este número de telefone. Se o cliente perguntar sobre um serviço específico, peça o número da OS para poder buscar. Caso o cliente já tenha informado o número da OS mas você não tem os dados, diga que não localizou e peça para confirmar o número. NÃO ofereça transferir para atendente humano, tente resolver sozinha.\n`;
   }
 
   if (knowledge.length > 0) {
@@ -350,8 +377,9 @@ INSTRUÇÃO FINAL:
 - Se for uma saudação, responda de forma acolhedora e pergunte como pode ajudar
 - Se perguntar sobre status da OS, use as informações acima
 - Se quiser aprovar orçamento e tiver link, envie o link
-- Se não souber responder com certeza, use [TRANSFERIR_HUMANO]
-- NÃO inclua [TRANSFERIR_HUMANO] se conseguir responder adequadamente
+- NÃO use [TRANSFERIR_HUMANO] a menos que o cliente peça explicitamente para falar com uma pessoa
+- NÃO ofereça transferir para atendente humano. Tente resolver tudo sozinha
+- Se não souber algo, diga que vai verificar com a equipe, mas NÃO transfira automaticamente
 - Lembre-se: você está em um chat WhatsApp, mantenha mensagens curtas e naturais`;
 
   return prompt;
