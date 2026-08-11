@@ -388,9 +388,9 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     }
   }, [abaAtiva, osId, usuario?.id]);
 
-  // Carrega markups quando a OS for carregada (para OW)
+  // Carrega markups quando a OS for carregada
   useEffect(() => {
-    if ((os?.tipo_os === 'OW' || os?.tipo_os === 'LP') && os?.unidade_id && os?.tipo_orcamento) {
+    if (os?.unidade_id && os?.tipo_orcamento) {
       loadMarkups();
     }
   }, [os?.tipo_os, os?.unidade_id, os?.tipo_orcamento]);
@@ -992,47 +992,50 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     }
   };
 
-  const calcularValorComMarkup = (valorGSPN: number): number => {
-    // Validação de entrada
+  const calcularValorComMarkup = (valorGSPN: number): { valor: number; trava: boolean; minVenda: number | null; markup: any | null } => {
     if (isNaN(valorGSPN) || !isFinite(valorGSPN) || valorGSPN <= 0) {
-      return 0;
+      return { valor: 0, trava: false, minVenda: null, markup: null };
     }
 
-    // Se não há markups, retorna o valor original
     if (markups.length === 0) {
-      return valorGSPN;
+      return { valor: valorGSPN, trava: false, minVenda: null, markup: null };
     }
 
-    // Procura o markup aplicável
     const markupAplicavel = markups.find(m => {
       if (!m.ativo) return false;
-      const dentroMin = m.valor_minimo === null || valorGSPN >= m.valor_minimo;
-      const dentroMax = m.valor_maximo === null || valorGSPN <= m.valor_maximo;
+      const dentroMin = m.valor_minimo === null || m.valor_minimo === undefined || valorGSPN >= Number(m.valor_minimo);
+      const dentroMax = m.valor_maximo === null || m.valor_maximo === undefined || valorGSPN <= Number(m.valor_maximo);
       return dentroMin && dentroMax;
     });
 
     if (!markupAplicavel) {
-      return valorGSPN;
+      return { valor: valorGSPN, trava: false, minVenda: null, markup: null };
     }
 
-    // Aplicar markup baseado no tipo
     let valorFinal = valorGSPN;
 
     switch (markupAplicavel.tipo) {
       case 'percentual':
-        valorFinal = valorGSPN * (1 + markupAplicavel.valor / 100);
+        valorFinal = valorGSPN * (1 + Number(markupAplicavel.valor) / 100);
         break;
       case 'multiplicador':
-        valorFinal = valorGSPN * markupAplicavel.valor;
+        valorFinal = valorGSPN * Number(markupAplicavel.valor);
         break;
       case 'valor_fixo':
-        valorFinal = valorGSPN + markupAplicavel.valor;
+        valorFinal = valorGSPN + Number(markupAplicavel.valor);
         break;
       default:
         valorFinal = valorGSPN;
     }
 
-    return valorFinal;
+    const minVenda = markupAplicavel.preco_minimo_venda ? Number(markupAplicavel.preco_minimo_venda) : null;
+    let trava = false;
+    if (minVenda && valorFinal < minVenda) {
+      valorFinal = minVenda;
+      trava = true;
+    }
+
+    return { valor: valorFinal, trava, minVenda, markup: markupAplicavel };
   };
 
   const buscarSugestoesPecasOW = async (codigo: string) => {
@@ -1111,9 +1114,10 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         throw new Error('Peça não encontrada');
       }
 
-      // Calcula valores
+      // Calcula valores com markup e trava
       const valorGSPN = valorNum;
-      const valorComMarkup = os?.tipo_os === 'OW' ? calcularValorComMarkup(valorGSPN) : valorGSPN;
+      const markupResult = calcularValorComMarkup(valorGSPN);
+      const valorComMarkup = markupResult.valor;
       const valorTotal = valorComMarkup * Math.max(peca.quantidade || 1, 1);
 
       // Atualiza a peça (corrige quantidade 0 para 1 se necessário)
@@ -1316,7 +1320,8 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
     setAdicionandoPecaOW(true);
     try {
-      const valorComMarkup = calcularValorComMarkup(valorGSPNNum);
+      const markupResult = calcularValorComMarkup(valorGSPNNum);
+      const valorComMarkup = markupResult.valor;
       const quantidade = novaPecaQuantidadeOW;
       const valorTotal = valorComMarkup * quantidade;
 
@@ -4235,14 +4240,27 @@ Não haverá cobrança ao cliente.`
                         className="neon-input w-full"
                         placeholder="0.00"
                       />
-                      {novaPecaValorGSPN && !isNaN(parseFloat(sanitizeGSPNValue(novaPecaValorGSPN))) && parseFloat(sanitizeGSPNValue(novaPecaValorGSPN)) > 0 && (
-                        <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
-                          Valor c/ Markup: R$ {(() => {
-                            const valor = calcularValorComMarkup(parseFloat(sanitizeGSPNValue(novaPecaValorGSPN)));
-                            return (isNaN(valor) || !isFinite(valor)) ? '0.00' : valor.toFixed(2);
-                          })()}
-                        </p>
-                      )}
+                      {novaPecaValorGSPN && !isNaN(parseFloat(sanitizeGSPNValue(novaPecaValorGSPN))) && parseFloat(sanitizeGSPNValue(novaPecaValorGSPN)) > 0 && (() => {
+                        const result = calcularValorComMarkup(parseFloat(sanitizeGSPNValue(novaPecaValorGSPN)));
+                        const valorStr = (isNaN(result.valor) || !isFinite(result.valor)) ? '0.00' : result.valor.toFixed(2);
+                        return (
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-xs" style={{ color: '#FFA500' }}>
+                              Valor c/ Markup: R$ {valorStr}
+                              {result.markup && (
+                                <span className="text-gray-500 ml-1">
+                                  ({result.markup.tipo === 'multiplicador' ? `x${Number(result.markup.valor).toFixed(2)}` : result.markup.tipo === 'percentual' ? `+${Number(result.markup.valor)}%` : `+R${Number(result.markup.valor).toFixed(2)}`})
+                                </span>
+                              )}
+                            </p>
+                            {result.trava && result.minVenda && (
+                              <p className="text-[10px] text-amber-400">
+                                Trava Min. Venda aplicada: R$ {result.minVenda.toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {markups.length === 0 && (
                         <p className="text-[10px] text-red-400 mt-1">
                           Nenhum markup configurado
@@ -4439,7 +4457,7 @@ Não haverá cobrança ao cliente.`
                               {/* ── VALOR GSPN (base) — para peças gspn/manual ou todas em SC/ACC ── */}
                               {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || isLP) && !(peca as any)._isOrphanReq && (
                                 editandoValorGSPN[peca.id] !== undefined ? (
-                                  <div className="flex items-center gap-2">
+                                  <><div className="flex items-center gap-2">
                                     <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
                                     <input
                                       type="text"
@@ -4479,6 +4497,28 @@ Não haverá cobrança ao cliente.`
                                       <X className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
+                                  {(() => {
+                                    const rawVal = parseFloat(sanitizeGSPNValue(editandoValorGSPN[peca.id] || ''));
+                                    if (!rawVal || isNaN(rawVal) || rawVal <= 0) return null;
+                                    const result = calcularValorComMarkup(rawVal);
+                                    if (!result.markup) return null;
+                                    return (
+                                      <div className="mt-1 space-y-0.5">
+                                        <p className="text-[10px]" style={{ color: '#FFA500' }}>
+                                          Venda: R$ {result.valor.toFixed(2)}
+                                          <span className="text-gray-500 ml-1">
+                                            ({result.markup.tipo === 'multiplicador' ? `x${Number(result.markup.valor).toFixed(2)}` : result.markup.tipo === 'percentual' ? `+${Number(result.markup.valor)}%` : `+R${Number(result.markup.valor).toFixed(2)}`})
+                                          </span>
+                                        </p>
+                                        {result.trava && result.minVenda && (
+                                          <p className="text-[10px] text-amber-400">
+                                            Trava Min. Venda: R$ {result.minVenda.toFixed(2)}
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                </>
                                 ) : (
                                   <div className="flex items-center gap-1.5">
                                     <p className="text-xs font-bold" style={{ color: '#9333EA' }}>

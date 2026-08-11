@@ -35,6 +35,7 @@ interface Markup {
   tipo: 'percentual' | 'multiplicador' | 'valor_fixo';
   valor: number;
   ativo: boolean;
+  preco_minimo_venda: number | null;
 }
 
 interface TaxaMaquina {
@@ -536,23 +537,32 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
 
     const markupAplicavel = markups.find(m => {
       if (!m.ativo) return false;
-      const dentroMin = m.valor_minimo === null || valorGSPN >= m.valor_minimo;
-      const dentroMax = m.valor_maximo === null || valorGSPN <= m.valor_maximo;
+      const dentroMin = m.valor_minimo === null || m.valor_minimo === undefined || valorGSPN >= Number(m.valor_minimo);
+      const dentroMax = m.valor_maximo === null || m.valor_maximo === undefined || valorGSPN <= Number(m.valor_maximo);
       return dentroMin && dentroMax;
     });
 
     if (!markupAplicavel) return valorGSPN;
 
+    let valorFinal = valorGSPN;
     switch (markupAplicavel.tipo) {
       case 'percentual':
-        return valorGSPN * (1 + markupAplicavel.valor / 100);
+        valorFinal = valorGSPN * (1 + Number(markupAplicavel.valor) / 100);
+        break;
       case 'multiplicador':
-        return valorGSPN * markupAplicavel.valor;
+        valorFinal = valorGSPN * Number(markupAplicavel.valor);
+        break;
       case 'valor_fixo':
-        return valorGSPN + markupAplicavel.valor;
-      default:
-        return valorGSPN;
+        valorFinal = valorGSPN + Number(markupAplicavel.valor);
+        break;
     }
+
+    const minVenda = markupAplicavel.preco_minimo_venda ? Number(markupAplicavel.preco_minimo_venda) : null;
+    if (minVenda && valorFinal < minVenda) {
+      valorFinal = minVenda;
+    }
+
+    return valorFinal;
   };
 
   // Numero da cotacao sera gerado automaticamente pelo banco (COT-01, COT-02, etc)
