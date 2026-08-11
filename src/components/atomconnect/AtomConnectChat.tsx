@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight, ShieldAlert, Lock, Timer, FileCode2 } from 'lucide-react';
+import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight, ShieldAlert, Lock, Timer, FileCode2, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -1437,6 +1437,54 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   };
 
+  const [retryingMedia, setRetryingMedia] = useState<Record<string, boolean>>({});
+
+  const retryMediaDownload = async (msg: Mensagem) => {
+    if (!instancia || !msg.message_id) return;
+    setRetryingMedia(prev => ({ ...prev, [msg.id]: true }));
+    try {
+      const remoteJid = conversaSelecionada?.telefone
+        ? `${conversaSelecionada.telefone}@s.whatsapp.net`
+        : undefined;
+      const resp = await fetch(`${instancia.api_url}/chat/getBase64FromMediaMessage/${instancia.instance_name}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: instancia.api_key },
+        body: JSON.stringify({
+          message: { key: { id: msg.message_id, remoteJid, fromMe: msg.from_me } },
+          convertToMp4: false,
+        }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const result = await resp.json();
+      const b64 = result.base64 || result.data || result.media;
+      if (!b64 || b64.length < 100) throw new Error('No media data');
+
+      const clean = b64.replace(/^data:[^;]+;base64,/, '');
+      const binary = atob(clean);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      const ext = getExtensionFromMimetype(msg.media_mimetype || 'application/octet-stream');
+      const fileName = `${msg.conversa_id}/${msg.message_id}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('atom-connect-media')
+        .upload(fileName, bytes, { contentType: msg.media_mimetype || 'application/octet-stream', upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('atom-connect-media')
+        .getPublicUrl(fileName);
+
+      await supabase.from('atom_connect_mensagens').update({ media_url: publicUrl }).eq('id', msg.id);
+
+      setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, media_url: publicUrl } : m));
+    } catch (e) {
+      console.error('Retry media failed:', e);
+    } finally {
+      setRetryingMedia(prev => ({ ...prev, [msg.id]: false }));
+    }
+  };
+
   const [allUnitOS, setAllUnitOS] = useState<OS[]>([]);
   const [loadingAllOS, setLoadingAllOS] = useState(false);
   const [osLoadError, setOsLoadError] = useState<string | null>(null);
@@ -2308,7 +2356,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                                 />
                                 <div className="hidden w-full h-32 bg-white/5 rounded flex-col items-center justify-center">
                                   <ImageLucide className="w-8 h-8 text-gray-500 mb-2" />
-                                  <span className="text-xs text-gray-400">Imagem indisponivel</span>
+                                  <span className="text-xs text-gray-400">Imagem indispon&#237;vel</span>
+                                  <button onClick={() => retryMediaDownload(msg)} disabled={retryingMedia[msg.id]} className="mt-2 p-1.5 hover:bg-white/10 rounded" title="Tentar baixar novamente">
+                                    {retryingMedia[msg.id] ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : <RefreshCw className="w-4 h-4 text-gray-400" />}
+                                  </button>
                                 </div>
                                 <button
                                   onClick={() => downloadMedia(mediaUrl, msg.caption || 'imagem', msg.media_mimetype)}
@@ -2322,7 +2373,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           ) : (
                             <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
                               <ImageLucide className="w-5 h-5 text-gray-500" />
-                              <span className="text-xs text-gray-400">Imagem indisponivel</span>
+                              <span className="text-xs text-gray-400">Imagem indisponível</span>
+                              <button onClick={() => retryMediaDownload(msg)} disabled={retryingMedia[msg.id]} className="ml-auto p-1 hover:bg-white/10 rounded" title="Tentar baixar novamente">
+                                {retryingMedia[msg.id] ? <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-gray-400" />}
+                              </button>
                             </div>
                           );
                         })()}
@@ -2371,6 +2425,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                             <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
                               <Mic className="w-5 h-5 text-gray-500" />
                               <span className="text-xs text-gray-400">Áudio indisponível</span>
+                              <button onClick={() => retryMediaDownload(msg)} disabled={retryingMedia[msg.id]} className="ml-auto p-1 hover:bg-white/10 rounded" title="Tentar baixar novamente">
+                                {retryingMedia[msg.id] ? <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-gray-400" />}
+                              </button>
                             </div>
                           );
                         })()}
@@ -2414,6 +2471,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                             <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
                               <Video className="w-5 h-5 text-gray-500" />
                               <span className="text-xs text-gray-400">Vídeo indisponível</span>
+                              <button onClick={() => retryMediaDownload(msg)} disabled={retryingMedia[msg.id]} className="ml-auto p-1 hover:bg-white/10 rounded" title="Tentar baixar novamente">
+                                {retryingMedia[msg.id] ? <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-gray-400" />}
+                              </button>
                             </div>
                           );
                         })()}

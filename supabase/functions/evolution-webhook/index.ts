@@ -121,11 +121,13 @@ async function uploadBase64ToStorage(
   try {
     const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
     if (!cleanBase64 || cleanBase64.length < 100) {
+      console.log(`[Upload Media] base64 too short (${cleanBase64?.length || 0} chars) for ${messageId}`);
       return null;
     }
 
     const binaryData = Uint8Array.from(atob(cleanBase64), (c) => c.charCodeAt(0));
     if (binaryData.length === 0) {
+      console.log(`[Upload Media] Empty binary for ${messageId}`);
       return null;
     }
 
@@ -140,6 +142,7 @@ async function uploadBase64ToStorage(
       });
 
     if (uploadError) {
+      console.log(`[Upload Media] Storage upload error for ${messageId}: ${JSON.stringify(uploadError)}`);
       return null;
     }
 
@@ -147,9 +150,10 @@ async function uploadBase64ToStorage(
       .from("atom-connect-media")
       .getPublicUrl(fileName);
 
+    console.log(`[Upload Media] Success for ${messageId}: ${publicUrl}`);
     return publicUrl;
   } catch (error) {
-    // ignored
+    console.log(`[Upload Media] Exception for ${messageId}: ${error}`);
     return null;
   }
 }
@@ -159,9 +163,15 @@ async function fetchAndUploadMedia(
   instancia: { api_url: string; api_key: string; instance_name: string },
   messageId: string,
   mimetype: string,
-  conversaId: string
+  conversaId: string,
+  remoteJid?: string,
+  fromMe?: boolean
 ): Promise<string | null> {
   try {
+    const messageKey: any = { id: messageId };
+    if (remoteJid) messageKey.remoteJid = remoteJid;
+    if (fromMe !== undefined) messageKey.fromMe = fromMe;
+
     const response = await fetch(
       `${instancia.api_url}/chat/getBase64FromMediaMessage/${instancia.instance_name}`,
       {
@@ -171,7 +181,7 @@ async function fetchAndUploadMedia(
           apikey: instancia.api_key,
         },
         body: JSON.stringify({
-          message: { key: { id: messageId } },
+          message: { key: messageKey },
           convertToMp4: false,
         }),
       }
@@ -483,6 +493,7 @@ Deno.serve(async (req: Request) => {
         senderPhone,
         senderName,
         groupSubject,
+        rawRemoteJid,
       });
     }
 
@@ -605,7 +616,7 @@ async function processMessage(
   fromMe: boolean,
   messageId: string,
   instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string },
-  groupInfo: { isGroup: boolean; groupJid: string | null; senderPhone: string; senderName: string; groupSubject: string } = { isGroup: false, groupJid: null, senderPhone: "", senderName: "", groupSubject: "" }
+  groupInfo: { isGroup: boolean; groupJid: string | null; senderPhone: string; senderName: string; groupSubject: string; rawRemoteJid?: string } = { isGroup: false, groupJid: null, senderPhone: "", senderName: "", groupSubject: "" }
 ) {
   // 1. Deduplication by message_id (primary check)
   if (messageId) {
@@ -906,14 +917,41 @@ async function processMessage(
       }
     }
 
+    // Also check for direct media URL from Evolution API
+    const directMediaUrl =
+      msg?.imageMessage?.url || msg?.videoMessage?.url || msg?.audioMessage?.url ||
+      msg?.documentMessage?.url || msg?.stickerMessage?.url ||
+      message?.message?.imageMessage?.url || message?.message?.videoMessage?.url ||
+      message?.message?.audioMessage?.url || message?.message?.documentMessage?.url;
+
     if (inlineBase64) {
       mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
+    } else if (directMediaUrl && (directMediaUrl.startsWith('http://') || directMediaUrl.startsWith('https://'))) {
+      try {
+        const mediaResp = await fetch(directMediaUrl);
+        if (mediaResp.ok) {
+          const arrayBuf = await mediaResp.arrayBuffer();
+          const uint8 = new Uint8Array(arrayBuf);
+          if (uint8.length > 0) {
+            let binary = '';
+            const chunkSize = 8192;
+            for (let i = 0; i < uint8.length; i += chunkSize) {
+              binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+            }
+            const b64 = btoa(binary);
+            mediaUrl = await uploadBase64ToStorage(supabase, b64, mediaMimetype, conversa.id, messageId);
+          }
+        }
+        if (!mediaUrl) console.log(`[Webhook Media] Direct URL download failed for ${messageId}: HTTP ${mediaResp?.status}`);
+      } catch (e) {
+        console.log(`[Webhook Media] Direct URL fetch error for ${messageId}: ${e}`);
+      }
     } else {
-      console.log(`[Webhook Media] No inline base64 found for messageId=${messageId} tipo=${tipo}. msg keys: ${JSON.stringify(Object.keys(msg || {}))}, data keys: ${JSON.stringify(Object.keys(data || {}))}, message keys: ${JSON.stringify(Object.keys(message || {}))}`);
+      console.log(`[Webhook Media] No inline base64 or direct URL for messageId=${messageId} tipo=${tipo}. msg keys: ${JSON.stringify(Object.keys(msg || {}))}`);
     }
 
-    if (!mediaUrl && !fromMe) {
-      mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id);
+    if (!mediaUrl) {
+      mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id, groupInfo.rawRemoteJid || groupInfo.groupJid || undefined, fromMe);
     }
 
     if (!mediaUrl) {
