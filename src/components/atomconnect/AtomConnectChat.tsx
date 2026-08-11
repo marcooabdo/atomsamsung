@@ -803,11 +803,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           const captionWithName = attendantName ? `*${attendantName}:*\n${file.name}` : file.name;
           const evolutionMessageId = await sendToEvolutionAPI(captionWithName, publicUrl, tipo, file.type, file.name);
 
-          const { error: insertError } = await supabase
+          const { data: insertedMedia, error: insertError } = await supabase
             .from('atom_connect_mensagens')
             .insert({
               conversa_id: conversa.id,
-              message_id: evolutionMessageId,
+              message_id: evolutionMessageId || `local-media-${Date.now()}`,
               from_me: true,
               tipo,
               conteudo: publicUrl,
@@ -817,10 +817,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               status: evolutionMessageId ? 'sent' : 'failed',
               enviado_por: usuario?.id,
               is_bot: false
-            });
+            })
+            .select()
+            .single();
 
-          if (insertError) {
-            // ignored
+          if (!insertError && insertedMedia) {
+            setMensagens(prev => {
+              if (prev.some(m => m.id === insertedMedia.id)) return prev;
+              return [...prev, insertedMedia];
+            });
+            scrollToBottom();
           }
         }
         setAttachments([]);
@@ -833,7 +839,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
         const insertData: Record<string, any> = {
           conversa_id: conversa.id,
-          message_id: evolutionMessageId,
+          message_id: evolutionMessageId || `local-${Date.now()}`,
           from_me: true,
           tipo: 'text',
           conteudo: messageContent,
@@ -851,12 +857,18 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           insertData.quoted_type = currentReplyTo.tipo;
         }
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('atom_connect_mensagens')
-          .insert(insertData);
+          .insert(insertData)
+          .select()
+          .single();
 
-        if (error) {
-          // ignored
+        if (!error && inserted) {
+          setMensagens(prev => {
+            if (prev.some(m => m.id === inserted.id)) return prev;
+            return [...prev, inserted];
+          });
+          scrollToBottom();
         }
       }
 
@@ -1071,9 +1083,41 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
     const hasRegraMsg = regraDefault && regraDefault.mensagem_avaliacao;
 
-    if (hasRegraMsg && instancia) {
+    let activeInstancia = instancia;
+    if (!activeInstancia && targetUnidadeId) {
+      const { data: inst } = await supabase
+        .from('atom_connect_instancias')
+        .select('*')
+        .eq('unidade_id', targetUnidadeId)
+        .eq('status', 'connected')
+        .limit(1)
+        .maybeSingle();
+      activeInstancia = inst;
+    }
+
+    let msgSent = false;
+
+    if (hasRegraMsg && activeInstancia) {
       try {
-        const evolutionMessageId = await sendToEvolutionAPI(regraDefault.mensagem_avaliacao);
+        const phoneNumber = conversa.is_group && conversa.group_jid
+          ? conversa.group_jid
+          : conversa.cliente_telefone.replace(/\D/g, '');
+
+        const response = await fetch(`${activeInstancia.api_url}/message/sendText/${activeInstancia.instance_name}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': activeInstancia.api_key
+          },
+          body: JSON.stringify({ number: phoneNumber, text: regraDefault.mensagem_avaliacao })
+        });
+
+        let evolutionMessageId: string | null = null;
+        if (response.ok) {
+          const result = await response.json();
+          evolutionMessageId = result.key?.id || result.messageId || null;
+          msgSent = true;
+        }
 
         await supabase
           .from('atom_connect_mensagens')
@@ -1083,7 +1127,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             from_me: true,
             tipo: 'text',
             conteudo: regraDefault.mensagem_avaliacao,
-            status: evolutionMessageId ? 'sent' : 'failed',
+            status: msgSent ? 'sent' : 'failed',
             is_bot: true,
             metadata: { tipo: 'avaliacao_request', regra_id: regraDefault.id }
           });
@@ -1092,14 +1136,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       }
     }
 
+    const activateGia = !!hasRegraMsg && msgSent;
+
     await supabase
       .from('atom_connect_conversas')
       .update({
         coluna_pipeline: 'finalizado_nps',
-        is_bot_ativo: !!hasRegraMsg,
-        aguardando_avaliacao: !!hasRegraMsg,
-        regra_finalizacao_id: hasRegraMsg ? regraDefault.id : null,
-        avaliacao_enviada_at: hasRegraMsg ? new Date().toISOString() : null,
+        is_bot_ativo: activateGia,
+        aguardando_avaliacao: activateGia,
+        regra_finalizacao_id: activateGia ? regraDefault.id : null,
+        avaliacao_enviada_at: activateGia ? new Date().toISOString() : null,
         resultado_conversa: data.resultado_conversa,
         valor_orcamento: data.valor_orcamento,
         resumo_fechamento: data.resumo_fechamento,
@@ -1111,7 +1157,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       })
       .eq('id', conversa.id);
 
-    if (hasRegraMsg) {
+    if (activateGia) {
       await supabase
         .from('atom_connect_mensagens')
         .insert({
@@ -1966,9 +2012,29 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 onClick={async () => {
                   await supabase
                     .from('atom_connect_conversas')
-                    .update({ atendente_id: usuario?.id })
+                    .update({
+                      atendente_id: usuario?.id,
+                      is_bot_ativo: false,
+                      aguardando_avaliacao: false,
+                      regra_finalizacao_id: null,
+                    })
                     .eq('id', conversa.id);
+
+                  await supabase
+                    .from('atom_connect_mensagens')
+                    .insert({
+                      conversa_id: conversa.id,
+                      message_id: `system-assume-${Date.now()}`,
+                      from_me: true,
+                      tipo: 'text',
+                      conteudo: '👤 Atendimento assumido por operador. A GIA foi pausada.',
+                      status: 'sent',
+                      enviado_por: usuario?.id,
+                      is_bot: false
+                    });
+
                   onUpdate();
+                  loadMensagens();
                 }}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all"
                 style={{

@@ -1169,7 +1169,20 @@ async function processMessage(
       .maybeSingle();
 
     // If the message is NOT from the bot AND bot is currently active, disable it
-    if (thisMsg && !thisMsg.is_bot && conversa.is_bot_ativo) {
+    // If message not found in DB yet, wait briefly and retry
+    let isBot = thisMsg?.is_bot;
+    if (!thisMsg && conversa.is_bot_ativo) {
+      await new Promise(r => setTimeout(r, 1500));
+      const { data: retryMsg } = await supabase
+        .from("atom_connect_mensagens")
+        .select("is_bot")
+        .eq("conversa_id", conversa.id)
+        .eq("message_id", messageId)
+        .maybeSingle();
+      isBot = retryMsg?.is_bot;
+    }
+
+    if (isBot !== true && conversa.is_bot_ativo) {
       await supabase
         .from("atom_connect_conversas")
         .update({

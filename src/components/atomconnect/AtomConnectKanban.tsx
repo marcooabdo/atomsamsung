@@ -322,7 +322,12 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
     e.stopPropagation();
     await supabase
       .from('atom_connect_conversas')
-      .update({ atendente_id: usuario?.id })
+      .update({
+        atendente_id: usuario?.id,
+        is_bot_ativo: false,
+        aguardando_avaliacao: false,
+        regra_finalizacao_id: null,
+      })
       .eq('id', conversa.id);
     onUpdateConversa();
   };
