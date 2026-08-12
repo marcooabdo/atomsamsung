@@ -185,6 +185,61 @@ async function uploadBase64ToStorage(
   }
 }
 
+async function downloadMediaFromMetaGraphAPI(
+  supabase: any,
+  mediaId: string,
+  waToken: string,
+  mimetype: string,
+  conversaId: string,
+  messageId: string
+): Promise<string | null> {
+  try {
+    const metaResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${waToken}` },
+    });
+    if (!metaResp.ok) {
+      console.log(`[Meta Graph] Get media URL failed HTTP ${metaResp.status} for mediaId=${mediaId}`);
+      return null;
+    }
+    const metaData = await metaResp.json();
+    const downloadUrl = metaData.url;
+    if (!downloadUrl) {
+      console.log(`[Meta Graph] No URL in response for mediaId=${mediaId}`);
+      return null;
+    }
+
+    const dlResp = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${waToken}` },
+    });
+    if (!dlResp.ok) {
+      console.log(`[Meta Graph] Download failed HTTP ${dlResp.status} for mediaId=${mediaId}`);
+      return null;
+    }
+    const arrayBuf = await dlResp.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuf);
+    if (uint8.length < 100) {
+      console.log(`[Meta Graph] Downloaded file too small (${uint8.length} bytes) for mediaId=${mediaId}`);
+      return null;
+    }
+
+    const ext = getExtensionFromMimetype(mimetype);
+    const fileName = `${conversaId}/${messageId}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("atom-connect-media")
+      .upload(fileName, uint8, { contentType: mimetype, upsert: true });
+    if (upErr) {
+      console.log(`[Meta Graph] Upload error: ${upErr.message}`);
+      return null;
+    }
+    const { data: { publicUrl } } = supabase.storage.from("atom-connect-media").getPublicUrl(fileName);
+    console.log(`[Meta Graph] Success for mediaId=${mediaId}: ${publicUrl}`);
+    return publicUrl;
+  } catch (e) {
+    console.log(`[Meta Graph] Error for mediaId=${mediaId}: ${e}`);
+    return null;
+  }
+}
+
 async function fetchAndUploadMedia(
   supabase: any,
   instancia: { api_url: string; api_key: string; instance_name: string },
@@ -269,7 +324,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: msg, error: msgErr } = await supabase
         .from("atom_connect_mensagens")
-        .select("id, message_id, conversa_id, from_me, media_mimetype, media_url, tipo")
+        .select("id, message_id, conversa_id, from_me, media_mimetype, media_url, tipo, meta_media_id")
         .eq("id", mensagem_id)
         .single();
 
@@ -302,7 +357,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: inst } = await supabase
         .from("atom_connect_instancias")
-        .select("api_url, api_key, instance_name")
+        .select("api_url, api_key, instance_name, wa_business_token")
         .eq("id", conv.instancia_id)
         .single();
 
@@ -322,15 +377,25 @@ Deno.serve(async (req: Request) => {
       const mimetype = msg.media_mimetype || "application/octet-stream";
       let mediaUrl: string | null = null;
 
-      mediaUrl = await fetchAndUploadMedia(
-        supabase,
-        inst,
-        msg.message_id,
-        mimetype,
-        msg.conversa_id,
-        remoteJid,
-        msg.from_me
-      );
+      // Try Meta Graph API first using stored meta_media_id
+      if (!mediaUrl && msg.meta_media_id && inst.wa_business_token) {
+        mediaUrl = await downloadMediaFromMetaGraphAPI(
+          supabase, msg.meta_media_id, inst.wa_business_token,
+          mimetype, msg.conversa_id, msg.message_id
+        );
+      }
+
+      if (!mediaUrl) {
+        mediaUrl = await fetchAndUploadMedia(
+          supabase,
+          inst,
+          msg.message_id,
+          mimetype,
+          msg.conversa_id,
+          remoteJid,
+          msg.from_me
+        );
+      }
 
       if (mediaUrl) {
         await supabase
@@ -580,15 +645,13 @@ Deno.serve(async (req: Request) => {
 
       const { data: instancia } = await supabase
         .from("atom_connect_instancias")
-        .select("id, unidade_id, api_url, api_key, instance_name")
+        .select("id, unidade_id, api_url, api_key, instance_name, wa_business_token")
         .eq("instance_name", instanceName)
         .maybeSingle();
 
       let targetInstancia = instancia;
 
       if (!targetInstancia) {
-        // For group messages, do NOT fallback to another instance
-        // as this would create the group in the wrong unit
         if (isGroup) {
           return new Response(JSON.stringify({ skip: "group_no_matching_instance" }), {
             status: 200,
@@ -598,7 +661,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: fallbackInstancia } = await supabase
           .from("atom_connect_instancias")
-          .select("id, unidade_id, api_url, api_key, instance_name")
+          .select("id, unidade_id, api_url, api_key, instance_name, wa_business_token")
           .limit(1)
           .maybeSingle();
 
@@ -1033,6 +1096,7 @@ async function processMessage(
   }
 
   let mediaUrl: string | null = null;
+  let metaMediaId: string | null = null;
   if (hasMedia && mediaMimetype) {
     // Look for base64 in all possible locations within the Evolution API payload
     let inlineBase64 =
@@ -1058,6 +1122,14 @@ async function processMessage(
       }
     }
 
+    // Extract Meta Cloud API media ID (used by WHATSAPP-BUSINESS integration)
+    metaMediaId =
+      msg?.imageMessage?.id || msg?.videoMessage?.id || msg?.audioMessage?.id ||
+      msg?.documentMessage?.id || msg?.stickerMessage?.id ||
+      message?.message?.imageMessage?.id || message?.message?.videoMessage?.id ||
+      message?.message?.audioMessage?.id || message?.message?.documentMessage?.id ||
+      message?.message?.stickerMessage?.id;
+
     // Also check for direct media URL from Evolution API
     const directMediaUrl =
       msg?.imageMessage?.url || msg?.videoMessage?.url || msg?.audioMessage?.url ||
@@ -1065,13 +1137,26 @@ async function processMessage(
       message?.message?.imageMessage?.url || message?.message?.videoMessage?.url ||
       message?.message?.audioMessage?.url || message?.message?.documentMessage?.url;
 
-
-
     if (inlineBase64) {
       mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
-    } else if (directMediaUrl && (directMediaUrl.startsWith('http://') || directMediaUrl.startsWith('https://'))) {
+    }
+
+    // Try Meta Graph API download (primary strategy for Cloud API instances)
+    if (!mediaUrl && metaMediaId && instancia?.wa_business_token) {
+      mediaUrl = await downloadMediaFromMetaGraphAPI(
+        supabase, metaMediaId, instancia.wa_business_token,
+        mediaMimetype, conversa.id, messageId
+      );
+    }
+
+    // Try direct URL download (with auth token if available)
+    if (!mediaUrl && directMediaUrl && (directMediaUrl.startsWith('http://') || directMediaUrl.startsWith('https://'))) {
       try {
-        const mediaResp = await fetch(directMediaUrl);
+        const headers: Record<string, string> = {};
+        if (instancia?.wa_business_token) {
+          headers.Authorization = `Bearer ${instancia.wa_business_token}`;
+        }
+        const mediaResp = await fetch(directMediaUrl, { headers });
         if (mediaResp.ok) {
           const arrayBuf = await mediaResp.arrayBuffer();
           const uint8 = new Uint8Array(arrayBuf);
@@ -1086,26 +1171,21 @@ async function processMessage(
                 .from("atom-connect-media")
                 .getPublicUrl(fileName);
               mediaUrl = publicUrl;
-              console.log(`[Webhook Media] Direct URL upload success: ${publicUrl}`);
-            } else {
-              console.log(`[Webhook Media] Direct URL upload error: ${upErr.message}`);
             }
           }
         }
-        if (!mediaUrl) console.log(`[Webhook Media] Direct URL download failed for ${messageId}: HTTP ${mediaResp?.status}`);
       } catch (e) {
         console.log(`[Webhook Media] Direct URL fetch error for ${messageId}: ${e}`);
       }
-    } else {
-      console.log(`[Webhook Media] No inline base64 or direct URL for messageId=${messageId} tipo=${tipo}. msg keys: ${JSON.stringify(Object.keys(msg || {}))}`);
     }
 
+    // Evolution getBase64 fallback (works for Baileys/non-Cloud instances)
     if (!mediaUrl) {
       mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id, groupInfo.rawRemoteJid || groupInfo.groupJid || undefined, fromMe);
     }
 
     if (!mediaUrl) {
-      console.log(`[Webhook Media] Failed to get media for messageId=${messageId}, tipo=${tipo}, fallback also failed`);
+      console.log(`[Webhook Media] All strategies failed for messageId=${messageId}, tipo=${tipo}, metaMediaId=${metaMediaId || 'none'}`);
     }
   }
 
@@ -1164,6 +1244,7 @@ async function processMessage(
     caption,
     media_url: mediaUrl,
     media_mimetype: mediaMimetype,
+    meta_media_id: metaMediaId || null,
     status: fromMe ? "sent" : "delivered",
     is_bot: false,
   };
