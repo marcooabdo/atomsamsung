@@ -507,13 +507,19 @@ Deno.serve(async (req: Request) => {
       // into two webhooks: first with pushName but no base64, second with base64 but no pushName)
       // Also allow through if this has ack/status data (it's a status update disguised as upsert)
       if (!fromMe && !isGroup && !senderName) {
-        const hasBase64Content =
+        const hasMediaContent =
           data?.base64 || message?.base64 || body?.base64 || body?.data?.base64 ||
           msg?.imageMessage?.base64 || msg?.videoMessage?.base64 ||
           msg?.audioMessage?.base64 || msg?.documentMessage?.base64 ||
-          msg?.stickerMessage?.base64;
+          msg?.stickerMessage?.base64 ||
+          msg?.imageMessage?.url || msg?.videoMessage?.url ||
+          msg?.audioMessage?.url || msg?.documentMessage?.url ||
+          msg?.stickerMessage?.url ||
+          msg?.imageMessage?.id || msg?.videoMessage?.id ||
+          msg?.audioMessage?.id || msg?.documentMessage?.id;
         const hasAckData = data?.ack !== undefined || message?.ack !== undefined || body?.ack !== undefined || data?.status !== undefined || message?.status !== undefined;
-        if (!hasBase64Content && !hasAckData) {
+        const hasTextContent = msg?.conversation || msg?.extendedTextMessage?.text || body?.text || data?.text || body?.body;
+        if (!hasMediaContent && !hasAckData && !hasTextContent) {
           return new Response(JSON.stringify({ skip: "no_push_name" }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
