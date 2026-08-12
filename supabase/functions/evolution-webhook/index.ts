@@ -1009,6 +1009,23 @@ async function processMessage(
     isNewConversa = true;
   }
 
+  // Auto-fill instancia_id if conversation was created without one (e.g. manual creation)
+  if (!isNewConversa && instancia?.id) {
+    try {
+      const { data: convCheck } = await supabase
+        .from("atom_connect_conversas")
+        .select("instancia_id")
+        .eq("id", conversa.id)
+        .maybeSingle();
+      if (convCheck && !convCheck.instancia_id) {
+        await supabase
+          .from("atom_connect_conversas")
+          .update({ instancia_id: instancia.id })
+          .eq("id", conversa.id);
+      }
+    } catch {}
+  }
+
   let mediaUrl: string | null = null;
   if (hasMedia && mediaMimetype) {
     // Look for base64 in all possible locations within the Evolution API payload
@@ -2352,4 +2369,3 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     try { await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Erro ao processar comando de rota. Tente novamente.`); } catch {}
   }
 }
-.
