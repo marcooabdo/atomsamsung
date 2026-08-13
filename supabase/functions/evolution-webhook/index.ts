@@ -93,23 +93,41 @@ function findBase64InPayload(obj: any, maxDepth = 4, currentPath = ""): { path: 
   return null;
 }
 
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "audio/ogg": "ogg",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/opus": "opus",
+  "audio/aac": "aac",
+  "audio/ogg; codecs=opus": "ogg",
+  "video/mp4": "mp4",
+  "video/3gpp": "3gp",
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-excel": "xls",
+  "text/plain": "txt",
+  "application/zip": "zip",
+};
+
+const EXT_TO_MIME: Record<string, string> = {};
+for (const [mime, ext] of Object.entries(MIME_TO_EXT)) {
+  if (!EXT_TO_MIME[ext]) EXT_TO_MIME[ext] = mime;
+}
+EXT_TO_MIME["jpeg"] = "image/jpeg";
+
 function getExtensionFromMimetype(mimetype: string): string {
-  const mimeMap: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/gif": "gif",
-    "image/webp": "webp",
-    "audio/ogg": "ogg",
-    "audio/mpeg": "mp3",
-    "audio/mp4": "m4a",
-    "audio/opus": "opus",
-    "audio/aac": "aac",
-    "audio/ogg; codecs=opus": "ogg",
-    "video/mp4": "mp4",
-    "video/3gpp": "3gp",
-    "application/pdf": "pdf",
-  };
-  return mimeMap[mimetype] || "bin";
+  return MIME_TO_EXT[mimetype] || "bin";
+}
+
+function inferMimetypeFromFileName(fileName: string): string | null {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  return ext ? (EXT_TO_MIME[ext] || null) : null;
 }
 
 function base64ToUint8Array(b64: string): Uint8Array {
@@ -191,7 +209,8 @@ async function downloadMediaFromMetaGraphAPI(
   waToken: string,
   mimetype: string,
   conversaId: string,
-  messageId: string
+  messageId: string,
+  mimeOut?: { resolved: string }
 ): Promise<string | null> {
   try {
     const metaResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
@@ -207,6 +226,12 @@ async function downloadMediaFromMetaGraphAPI(
       console.log(`[Meta Graph] No URL in response for mediaId=${mediaId}`);
       return null;
     }
+
+    // Use the mime_type from Meta's response if our mimetype is generic
+    if (metaData.mime_type && (mimetype === "application/octet-stream" || !mimetype)) {
+      mimetype = metaData.mime_type;
+    }
+    if (mimeOut) mimeOut.resolved = mimetype;
 
     const dlResp = await fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${waToken}` },
@@ -886,8 +911,15 @@ async function processMessage(
     hasMedia = true;
   } else if (msg.documentMessage) {
     tipo = "document";
-    caption = msg.documentMessage.fileName;
-    mediaMimetype = msg.documentMessage.mimetype || "application/octet-stream";
+    caption = msg.documentMessage.fileName || msg.documentMessage.title;
+    const docMime = msg.documentMessage.mimetype;
+    if (docMime && docMime !== "application/octet-stream") {
+      mediaMimetype = docMime;
+    } else if (caption) {
+      mediaMimetype = inferMimetypeFromFileName(caption) || "application/octet-stream";
+    } else {
+      mediaMimetype = "application/octet-stream";
+    }
     conteudo = caption || "[Documento]";
     hasMedia = true;
   } else if (msg.stickerMessage) {
@@ -1142,11 +1174,15 @@ async function processMessage(
     }
 
     // Try Meta Graph API download (primary strategy for Cloud API instances)
+    const mimeOut = { resolved: mediaMimetype };
     if (!mediaUrl && metaMediaId && instancia?.wa_business_token) {
       mediaUrl = await downloadMediaFromMetaGraphAPI(
         supabase, metaMediaId, instancia.wa_business_token,
-        mediaMimetype, conversa.id, messageId
+        mediaMimetype, conversa.id, messageId, mimeOut
       );
+      if (mimeOut.resolved !== mediaMimetype) {
+        mediaMimetype = mimeOut.resolved;
+      }
     }
 
     // Try direct URL download (with auth token if available)
