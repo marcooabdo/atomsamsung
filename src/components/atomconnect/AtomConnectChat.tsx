@@ -872,16 +872,33 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         }
       }
 
-      if (conversa.is_bot_ativo) {
+      const { data: freshConversa } = await supabase
+        .from('atom_connect_conversas')
+        .select('is_bot_ativo, atendente_id')
+        .eq('id', conversa.id)
+        .single();
+
+      const updateData: Record<string, any> = {};
+      const wasBotAtivo = freshConversa?.is_bot_ativo === true;
+
+      if (wasBotAtivo) {
+        updateData.is_bot_ativo = false;
+        updateData.aguardando_avaliacao = false;
+        updateData.regra_finalizacao_id = null;
+      }
+
+      if (usuario?.id && freshConversa?.atendente_id !== usuario.id) {
+        updateData.atendente_id = usuario.id;
+      }
+
+      if (Object.keys(updateData).length > 0) {
         await supabase
           .from('atom_connect_conversas')
-          .update({
-            is_bot_ativo: false,
-            aguardando_avaliacao: false,
-            regra_finalizacao_id: null,
-          })
+          .update(updateData)
           .eq('id', conversa.id);
+      }
 
+      if (wasBotAtivo) {
         await supabase
           .from('atom_connect_mensagens')
           .insert({
@@ -894,9 +911,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             enviado_por: usuario?.id,
             is_bot: false
           });
-
-        onUpdate();
       }
+
+      onUpdate();
     } catch (error) {
       setUploadError('Erro ao enviar mensagem. Tente novamente.');
     } finally {
@@ -2603,7 +2620,53 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
         {/* Input Area */}
         <div className="flex-shrink-0 p-3" style={{ borderTop: `1px solid ${borderColor}`, background: inputFooterBg }}>
-          {!conversa.is_group && !windowInfo.isOpen ? (
+          {conversa.atendente_id && conversa.atendente_id !== usuario?.id ? (
+            <div className="flex items-center gap-3 py-3 px-4 rounded-xl" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium" style={{ color: '#f59e0b' }}>
+                  Atendimento em andamento
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: textSecondary }}>
+                  Atendente: {atendentes.find(a => a.id === conversa.atendente_id)?.nome || 'Outro operador'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  await supabase
+                    .from('atom_connect_conversas')
+                    .update({
+                      atendente_id: usuario?.id,
+                      is_bot_ativo: false,
+                      aguardando_avaliacao: false,
+                      regra_finalizacao_id: null,
+                    })
+                    .eq('id', conversa.id);
+
+                  const nomeAnterior = atendentes.find(a => a.id === conversa.atendente_id)?.nome || 'outro operador';
+                  await supabase
+                    .from('atom_connect_mensagens')
+                    .insert({
+                      conversa_id: conversa.id,
+                      message_id: `system-assume-${Date.now()}`,
+                      from_me: true,
+                      tipo: 'text',
+                      conteudo: `👤 ${usuario?.nome || 'Operador'} assumiu o atendimento de ${nomeAnterior}.`,
+                      status: 'sent',
+                      enviado_por: usuario?.id,
+                      is_bot: false
+                    });
+
+                  onUpdate();
+                  loadMensagens();
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all hover:scale-[1.02]"
+                style={{ background: accentColor, color: '#000' }}
+              >
+                <UserPlus className="w-4 h-4" />
+                Assumir Atendimento
+              </button>
+            </div>
+          ) : !conversa.is_group && !windowInfo.isOpen ? (
             <button
               onClick={() => { setShowTemplateModal(true); loadMetaTemplates(); }}
               className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl font-semibold text-sm transition-all hover:scale-[1.01]"
