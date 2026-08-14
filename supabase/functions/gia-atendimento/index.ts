@@ -121,44 +121,81 @@ Deno.serve(async (req: Request) => {
     const history = (historyResult.data || []).reverse();
 
     async function loadOSDetails(osId: string) {
-      const { data: rows, error } = await supabase.from("os").select(OS_DETAIL_SELECT).eq("id", osId).limit(1);
-      if (error) console.error("loadOSDetails error:", error.message);
-      return rows && rows.length > 0 ? rows[0] : null;
+      try {
+        const { data: rows, error } = await supabase.from("os").select(OS_DETAIL_SELECT).eq("id", osId).limit(1);
+        if (!error && rows && rows.length > 0) return rows[0];
+        if (error) console.error("[GIA] loadOSDetails join query failed:", error.message, error.details, error.hint);
+        else console.warn("[GIA] loadOSDetails join query returned no rows for osId:", osId);
+      } catch (e) {
+        console.error("[GIA] loadOSDetails join query exception:", e);
+      }
+
+      // Fallback: fetch OS without relationship joins
+      try {
+        console.log("[GIA] Attempting fallback OS query (no joins) for osId:", osId);
+        const { data: fallbackRows, error: fallbackError } = await supabase.from("os").select("*").eq("id", osId).limit(1);
+        if (fallbackError) {
+          console.error("[GIA] loadOSDetails fallback also failed:", fallbackError.message);
+          return null;
+        }
+        if (fallbackRows && fallbackRows.length > 0) {
+          console.log("[GIA] Fallback OS query succeeded for osId:", osId);
+          return fallbackRows[0];
+        }
+        console.warn("[GIA] Fallback OS query returned no rows for osId:", osId);
+      } catch (e2) {
+        console.error("[GIA] loadOSDetails fallback exception:", e2);
+      }
+      return null;
     }
 
     async function findOSByPhone(phone: string) {
-      const suffix = phone.replace(/\D/g, "");
-      const phoneSuffix = suffix.length >= 10 ? suffix.slice(-10) : suffix;
-      const { data: rows, error } = await supabase
-        .from("os")
-        .select("id")
-        .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
-        .neq("arquivada", true)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (error) console.error("findOSByPhone error:", error.message);
-      return rows && rows.length > 0 ? rows[0].id : null;
+      try {
+        const suffix = phone.replace(/\D/g, "");
+        const phoneSuffix = suffix.length >= 10 ? suffix.slice(-10) : suffix;
+        console.log("[GIA] findOSByPhone searching with suffix:", phoneSuffix);
+        const { data: rows, error } = await supabase
+          .from("os")
+          .select("id")
+          .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
+          .neq("arquivada", true)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (error) {
+          console.error("[GIA] findOSByPhone error:", error.message);
+          return null;
+        }
+        if (rows && rows.length > 0) {
+          console.log("[GIA] findOSByPhone found OS:", rows[0].id);
+          return rows[0].id;
+        }
+        console.log("[GIA] findOSByPhone no OS found for suffix:", phoneSuffix);
+      } catch (e) {
+        console.error("[GIA] findOSByPhone exception:", e);
+      }
+      return null;
     }
 
     async function findOSByNumber(candidate: string) {
-      // Search samsung number first (exact match) — use array select to avoid maybeSingle 406 issues
-      const { data: samsungRows, error: e1 } = await supabase
-        .from("os")
-        .select("id")
-        .eq("numero_os_samsung", candidate)
-        .limit(1);
-      if (e1) console.error("findOSByNumber samsung error:", e1.message, candidate);
-      if (samsungRows && samsungRows.length > 0) return samsungRows[0].id;
+      try {
+        const { data: samsungRows, error: e1 } = await supabase
+          .from("os")
+          .select("id")
+          .eq("numero_os_samsung", candidate)
+          .limit(1);
+        if (e1) console.error("[GIA] findOSByNumber samsung error:", e1.message, candidate);
+        if (samsungRows && samsungRows.length > 0) return samsungRows[0].id;
 
-      // Fallback: search internal number (case-insensitive)
-      const { data: internaRows, error: e2 } = await supabase
-        .from("os")
-        .select("id")
-        .ilike("numero_os_interna", candidate)
-        .limit(1);
-      if (e2) console.error("findOSByNumber interna error:", e2.message, candidate);
-      if (internaRows && internaRows.length > 0) return internaRows[0].id;
-
+        const { data: internaRows, error: e2 } = await supabase
+          .from("os")
+          .select("id")
+          .ilike("numero_os_interna", candidate)
+          .limit(1);
+        if (e2) console.error("[GIA] findOSByNumber interna error:", e2.message, candidate);
+        if (internaRows && internaRows.length > 0) return internaRows[0].id;
+      } catch (e) {
+        console.error("[GIA] findOSByNumber exception:", e);
+      }
       return null;
     }
 
@@ -166,7 +203,11 @@ Deno.serve(async (req: Request) => {
 
     // 1) Try linked OS
     if (conversa.os_id) {
+      console.log("[GIA] Conversa has os_id:", conversa.os_id);
       osVinculada = await loadOSDetails(conversa.os_id);
+      if (!osVinculada) console.error("[GIA] FAILED to load OS despite conversa.os_id being set:", conversa.os_id);
+    } else {
+      console.log("[GIA] Conversa has no os_id, will try phone/number lookup");
     }
 
     // 2) Try by phone
