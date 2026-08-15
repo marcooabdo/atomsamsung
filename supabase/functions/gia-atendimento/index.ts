@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
       .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
     if (recentBotMsgs && recentBotMsgs.length >= MAX_BOT_MESSAGES_BEFORE_ESCALATION) {
-      await escalateToHuman(supabase, conversa, "Limite de mensagens automáticas atingido (20 em 24h)");
+      await moveToQueue(supabase, conversa, "Limite de mensagens automáticas atingido (20 em 24h)");
       return new Response(JSON.stringify({ escalated: true, reason: "message_limit" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -340,7 +340,7 @@ Deno.serve(async (req: Request) => {
       console.error("[GIA Atendimento] OpenAI error:", openaiResponse.status, errText);
 
       if (openaiResponse.status === 429 || openaiResponse.status >= 500) {
-        await escalateToHuman(supabase, conversa, "API da IA temporariamente indisponível");
+        await moveToQueue(supabase, conversa, "API da IA temporariamente indisponível");
         return new Response(JSON.stringify({ escalated: true, reason: "api_error" }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -361,7 +361,7 @@ Deno.serve(async (req: Request) => {
       .trim();
 
     if (shouldEscalate || !cleanResponse) {
-      await escalateToHuman(supabase, conversa, shouldEscalate ? "Cliente pediu atendente humano" : "Resposta vazia da IA");
+      await moveToQueue(supabase, conversa, shouldEscalate ? "Cliente pediu atendente humano" : "Resposta vazia da IA");
 
       if (cleanResponse) {
         await sendWhatsAppMessage(supabase, conversa, cleanResponse);
@@ -369,7 +369,7 @@ Deno.serve(async (req: Request) => {
 
       await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, cleanResponse || "(escalated)", tokensUsed, true, "GIA decidiu transferir", Date.now() - startTime);
 
-      return new Response(JSON.stringify({ escalated: true, response: cleanResponse }), {
+      return new Response(JSON.stringify({ success: true, response: cleanResponse, queued: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -645,16 +645,15 @@ async function sendWhatsAppMessage(supabase: any, conversa: any, rawText: string
     .eq("id", conversa.id);
 }
 
-async function escalateToHuman(supabase: any, conversa: any, reason: string): Promise<void> {
+async function moveToQueue(supabase: any, conversa: any, reason: string): Promise<void> {
   await supabase
     .from("atom_connect_conversas")
     .update({
-      is_bot_ativo: false,
       coluna_pipeline: "fila_espera",
     })
     .eq("id", conversa.id);
 
-  console.log(`[GIA Atendimento] Escalated conversa ${conversa.id} to human: ${reason}`);
+  console.log(`[GIA Atendimento] Moved conversa ${conversa.id} to fila_espera (bot stays active): ${reason}`);
 }
 
 async function logInteraction(
