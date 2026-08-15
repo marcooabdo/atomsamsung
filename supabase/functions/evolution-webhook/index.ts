@@ -952,7 +952,7 @@ async function processMessage(
 
   let { data: conversa } = await supabase
     .from("atom_connect_conversas")
-    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno")
+    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno, aguardando_avaliacao, regra_finalizacao_id, avaliacao_enviada_at, is_bot_ativo")
     .eq("cliente_telefone", phoneNumber)
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
@@ -961,7 +961,7 @@ async function processMessage(
     const without9 = "55" + phoneNumber.substring(2, 4) + phoneNumber.substring(5);
     const { data: altConversa } = await supabase
       .from("atom_connect_conversas")
-      .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno")
+      .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno, aguardando_avaliacao, regra_finalizacao_id, avaliacao_enviada_at, is_bot_ativo")
       .eq("cliente_telefone", without9)
       .eq("unidade_id", instancia.unidade_id)
       .maybeSingle();
@@ -1419,11 +1419,53 @@ async function processMessage(
           .maybeSingle();
 
         if (currentColumn?.is_final) {
-          if (firstColumn) {
+          if (conversa.aguardando_avaliacao) {
+            // Awaiting NPS rating — check if timeout expired
+            if (conversa.avaliacao_enviada_at && conversa.regra_finalizacao_id) {
+              const { data: regraTimeout } = await supabase
+                .from("atom_connect_regras_finalizacao")
+                .select("timeout_minutos, mensagem_timeout")
+                .eq("id", conversa.regra_finalizacao_id)
+                .maybeSingle();
+
+              if (regraTimeout?.timeout_minutos) {
+                const enviadaMs = new Date(conversa.avaliacao_enviada_at).getTime();
+                const limiteMs = regraTimeout.timeout_minutos * 60 * 1000;
+                if (Date.now() - enviadaMs > limiteMs) {
+                  // Timeout expired — send timeout message, clear rating state
+                  if (regraTimeout.mensagem_timeout) {
+                    try {
+                      const phoneForTimeout = phoneNumber.replace(/\D/g, "");
+                      await fetch(
+                        `${instancia.api_url}/message/sendText/${instancia.instance_name}`,
+                        {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+                          body: JSON.stringify({ number: phoneForTimeout, text: regraTimeout.mensagem_timeout }),
+                        }
+                      );
+                      await supabase.from("atom_connect_mensagens").insert({
+                        conversa_id: conversa.id,
+                        from_me: true,
+                        tipo: "text",
+                        conteudo: regraTimeout.mensagem_timeout,
+                        status: "sent",
+                        is_bot: true,
+                      });
+                    } catch (_) { /* ignore send errors */ }
+                  }
+                  updateData.aguardando_avaliacao = false;
+                  updateData.regra_finalizacao_id = null;
+                  // Stay in final column — next message will move to triagem
+                }
+              }
+            }
+            // Do NOT move to first column while awaiting rating or right after timeout
+          } else if (firstColumn) {
+            // Not awaiting rating (already answered or timeout already fired) — reopen
             updateData.coluna_pipeline = firstColumn.id;
             updateData.is_bot_ativo = true;
             updateData.atendente_id = null;
-            updateData.aguardando_avaliacao = false;
             updateData.regra_finalizacao_id = null;
           }
         } else if (firstColumn && conversa.coluna_pipeline === firstColumn.id) {
