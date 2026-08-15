@@ -89,7 +89,13 @@ Deno.serve(async (req: Request) => {
       .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
     if (recentBotMsgs && recentBotMsgs.length >= MAX_BOT_MESSAGES_BEFORE_ESCALATION) {
+      const limitMsg = "Percebi que já tivemos bastante conversa! Vou encaminhar você para nossa equipe para dar continuidade ao atendimento. Se estivermos fora do horário de expediente (segunda a sexta, 08:30 às 18:00), você será atendido assim que nosso time retornar. Aguarde um momento, por favor!";
+      await sendWhatsAppMessage(supabase, conversa, limitMsg);
       await moveToQueue(supabase, conversa, "Limite de mensagens automáticas atingido (20 em 24h)");
+      await supabase
+        .from("atom_connect_conversas")
+        .update({ is_bot_ativo: false })
+        .eq("id", conversa.id);
       return new Response(JSON.stringify({ escalated: true, reason: "message_limit" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
