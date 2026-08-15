@@ -402,11 +402,10 @@ Deno.serve(async (req: Request) => {
     if (shouldEscalate || !cleanResponse) {
       await moveToQueue(supabase, conversa, shouldEscalate ? "Cliente pediu atendente humano" : "Resposta vazia da IA");
 
-      if (cleanResponse) {
-        await sendWhatsAppMessage(supabase, conversa, cleanResponse);
-      }
+      const escalationMsg = cleanResponse || "Entendi! Vou te conectar com um de nossos especialistas. Em breve alguém da equipe vai te atender. Aguarde um momento, por favor!";
+      await sendWhatsAppMessage(supabase, conversa, escalationMsg);
 
-      await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, cleanResponse || "(escalated)", tokensUsed, true, "GIA decidiu transferir", Date.now() - startTime);
+      await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, escalationMsg, tokensUsed, true, "GIA decidiu transferir", Date.now() - startTime);
 
       return new Response(JSON.stringify({ success: true, response: cleanResponse, queued: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
