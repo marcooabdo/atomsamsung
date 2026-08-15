@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
         .limit(MAX_HISTORY_MESSAGES),
       supabase
         .from("gia_base_conhecimento")
-        .select("titulo, conteudo, categoria")
+        .select("titulo, conteudo, categoria, unidade_ids")
         .eq("ativo", true)
         .order("ordem"),
     ]);
@@ -271,7 +271,12 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const unitKnowledge = (knowledgeResult.data || []).filter((k: any) => !!k);
+    const conversaUnidadeId = conversa.unidade_id;
+    const unitKnowledge = (knowledgeResult.data || []).filter((k: any) => {
+      if (!k) return false;
+      if (!k.unidade_ids || k.unidade_ids.length === 0) return true;
+      return conversaUnidadeId && k.unidade_ids.includes(conversaUnidadeId);
+    });
 
     let orcamentoLink = "";
     if (osVinculada && phoneVerified) {
@@ -322,7 +327,9 @@ Deno.serve(async (req: Request) => {
     const hasTemplateSent = history.some((m: any) => m.from_me && m.metadata?.template_name);
 
     const osForPrompt = (osVinculada && phoneVerified) ? osVinculada : null;
-    const systemPrompt = buildSystemPrompt(conversa, osForPrompt, unitKnowledge, orcamentoLink, pipelineMensagem, clientMsgCount, hasTemplateSent, osFoundButPhoneBlocked);
+    const now = new Date();
+    const brTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const systemPrompt = buildSystemPrompt(conversa, osForPrompt, unitKnowledge, orcamentoLink, pipelineMensagem, clientMsgCount, hasTemplateSent, osFoundButPhoneBlocked, brTime);
 
     const messages: Array<{ role: string; content: string }> = [
       { role: "system", content: systemPrompt },
@@ -402,7 +409,7 @@ Deno.serve(async (req: Request) => {
     if (shouldEscalate || !cleanResponse) {
       await moveToQueue(supabase, conversa, shouldEscalate ? "Cliente pediu atendente humano" : "Resposta vazia da IA");
 
-      const escalationMsg = cleanResponse || "Entendi! Vou te conectar com um de nossos especialistas. Em breve alguém da equipe vai te atender. Aguarde um momento, por favor!";
+      const escalationMsg = cleanResponse || "Entendi que você gostaria de falar com nossa equipe! Vou encaminhar sua solicitação. Se estivermos fora do nosso horário de atendimento (segunda a sexta, 08:30 às 18:00), você será atendido assim que nosso time retornar. Aguarde um momento, por favor!";
       await sendWhatsAppMessage(supabase, conversa, escalationMsg);
 
       await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, escalationMsg, tokensUsed, true, "GIA decidiu transferir", Date.now() - startTime);
@@ -453,23 +460,56 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string, clientMsgCount?: number, hasTemplateSent?: boolean, phoneNotVerified?: boolean): string {
+function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string, clientMsgCount?: number, hasTemplateSent?: boolean, phoneNotVerified?: boolean, brTime?: Date): string {
   const nomeCliente = conversa.cliente_nome || "Cliente";
+
+  const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const currentTime = brTime || new Date();
+  const diaSemana = diasSemana[currentTime.getDay()];
+  const horaAtual = `${String(currentTime.getHours()).padStart(2, "0")}:${String(currentTime.getMinutes()).padStart(2, "0")}`;
+  const hora = currentTime.getHours();
+  const minuto = currentTime.getMinutes();
+  const diaUtil = currentTime.getDay() >= 1 && currentTime.getDay() <= 5;
+  const dentroHorario = diaUtil && ((hora > 8 || (hora === 8 && minuto >= 30)) && hora < 18);
 
   let prompt = `Você é a GIA (Global Intelligence Assistant), assistente virtual de atendimento ao cliente de uma assistência técnica autorizada Samsung.
 
-REGRAS OBRIGATÓRIAS:
+INFORMAÇÃO TEMPORAL:
+- Data/hora atual: ${diaSemana}, ${horaAtual} (horário de Brasília)
+- Horário de expediente: Segunda a Sexta, 08:30 às 18:00
+- Status: ${dentroHorario ? "DENTRO do horário de expediente" : "FORA do horário de expediente"}
+`;
+
+  if (knowledge.length > 0) {
+    prompt += `
+=== DIRETRIZES DA BASE DE CONHECIMENTO (PRIORIDADE MÁXIMA) ===
+ATENÇÃO: As instruções abaixo são DIRETRIZES PRIORITÁRIAS que você DEVE seguir ACIMA DE QUALQUER OUTRA REGRA.
+Elas definem como você deve atender, o que falar, como se comportar, como digitar e como agir em cada situação.
+Se houver conflito entre estas diretrizes e as regras gerais abaixo, ESTAS DIRETRIZES VENCEM SEMPRE.
+Quando uma instrução mencionar um template específico (ex: 'se for o template inicial_os'), verifique no histórico se esse template foi enviado (aparece como [TEMPLATE ENVIADO: nome_do_template]).
+Quando mencionar tipos de mensagem (ex: 'se o cliente enviou anexo/foto/documento'), verifique os indicadores no histórico (ex: [CLIENTE ENVIOU IMAGEM], [CLIENTE ENVIOU DOCUMENTO]).
+Siga cada instrução ao pé da letra, respeitando as condições descritas.
+`;
+    for (const k of knowledge) {
+      prompt += `\n[${k.categoria.toUpperCase()}] ${k.titulo}:\n${k.conteudo}\n`;
+    }
+    prompt += `\n=== FIM DAS DIRETRIZES PRIORITÁRIAS ===\n`;
+  }
+
+  prompt += `
+REGRAS GERAIS (subordinadas às diretrizes da base de conhecimento acima):
 1. Seja sempre educada, profissional e empática
 2. Use português brasileiro natural, sem exagero de emojis (máximo 1-2 por mensagem)
 3. Nunca invente informações — se não souber algo, diga que não tem essa informação no momento e que vai encaminhar para a equipe verificar
 4. Nunca revele que é uma IA, se perguntar diga que é a GIA, assistente do atendimento
 5. Mantenha respostas concisas (máximo 3-4 parágrafos)
-6. APENAS inclua [TRANSFERIR_HUMANO] quando o cliente EXPLICITAMENTE pedir para falar com um atendente/pessoa/humano, ou quando ficar muito agressivo. NÃO ofereça transferir para humano por conta própria — tente resolver a questão primeiro
+6. APENAS inclua [TRANSFERIR_HUMANO] quando o cliente EXPLICITAMENTE pedir para falar com um atendente/pessoa/humano, ou quando ficar muito agressivo. Quando usar [TRANSFERIR_HUMANO], SEMPRE escreva uma mensagem completa para o cliente junto — siga as diretrizes da base de conhecimento (ex: informar sobre horário de funcionamento, reforçar que está fora do expediente, etc). NUNCA envie APENAS a tag sem texto
 7. NÃO mencione a possibilidade de transferir para atendente humano a menos que o cliente peça. Resolva você mesma o máximo possível
 8. Quando você NÃO conseguir resolver algo e precisar que a equipe verifique (ex: não encontrou a OS, não tem a informação solicitada), inclua [ENCAMINHAR_EQUIPE] na resposta. Isso coloca o cliente na fila de espera para um atendente verificar
 9. Formate com *negrito* para destacar informações importantes (formato WhatsApp)
 10. NUNCA inclua seu nome ou cabeçalho como "GIA - Global Intelligence Assistant:" no início da resposta. Apenas responda diretamente ao cliente. O sistema já adiciona o cabeçalho automaticamente
 11. Você NÃO consegue visualizar ou analisar imagens, fotos, vídeos ou áudios. Quando o cliente enviar qualquer mídia (fotos, vídeos, documentos, áudios), agradeça pelo envio, informe que a equipe vai analisar o material e inclua [ENCAMINHAR_EQUIPE] na resposta para que um atendente humano verifique. Nunca finja que conseguiu ver ou analisar o conteúdo da mídia
+12. Quando usar [TRANSFERIR_HUMANO] ou [ENCAMINHAR_EQUIPE], sua resposta DEVE conter texto visível para o cliente além da tag. A tag é processada internamente e removida — o cliente só vê o texto. Se a base de conhecimento tem instruções sobre o que dizer nessa situação (ex: horário de funcionamento, fora do expediente), SIGA essas instruções
 
 PERSONALIDADE:
 - Acolhedora e paciente
@@ -589,13 +629,7 @@ NUNCA revele o número da OS, status, valores, dados do aparelho ou qualquer out
     prompt += `\nNENHUMA OS VINCULADA: Não encontrei uma ordem de serviço vinculada a este número de telefone. Se o cliente perguntar sobre um serviço específico, peça o número da OS para poder buscar. Caso o cliente já tenha informado o número da OS mas você não tem os dados, diga que não localizou e peça para confirmar o número. NÃO ofereça transferir para atendente humano, tente resolver sozinha.\n`;
   }
 
-  if (knowledge.length > 0) {
-    prompt += "\n=== INSTRUÇÕES E BASE DE CONHECIMENTO ===\n";
-    prompt += "IMPORTANTE: As instruções abaixo são REGRAS que você DEVE seguir. Quando uma instrução mencionar um template específico (ex: 'se for o template inicial_os'), verifique no histórico se esse template foi enviado (aparece como [TEMPLATE ENVIADO: nome_do_template]). Quando mencionar tipos de mensagem (ex: 'se o cliente enviou anexo/foto/documento'), verifique os indicadores no histórico (ex: [CLIENTE ENVIOU IMAGEM], [CLIENTE ENVIOU DOCUMENTO]).\nSiga cada instrução ao pé da letra, respeitando as condições descritas.\n";
-    for (const k of knowledge) {
-      prompt += `\n[${k.categoria.toUpperCase()}] ${k.titulo}:\n${k.conteudo}\n`;
-    }
-  }
+
 
   prompt += `
 REGRA PRIORITÁRIA — PRIMEIRO CONTATO SAMSUNG:
@@ -623,7 +657,8 @@ INSTRUÇÃO FINAL:
 - NÃO ofereça transferir para atendente humano. Tente resolver tudo sozinha
 - Se não souber algo ou não encontrou a OS, diga que vai encaminhar para a equipe verificar e inclua [ENCAMINHAR_EQUIPE] na resposta
 - Se o cliente enviou foto, vídeo, documento ou áudio, agradeça e diga que a equipe vai analisar. Inclua [ENCAMINHAR_EQUIPE]. NUNCA diga que você viu ou analisou a mídia
-- Lembre-se: você está em um chat WhatsApp, mantenha mensagens curtas e naturais`;
+- Lembre-se: você está em um chat WhatsApp, mantenha mensagens curtas e naturais
+- REGRA CRÍTICA: Ao usar [TRANSFERIR_HUMANO] ou [ENCAMINHAR_EQUIPE], SEMPRE inclua uma mensagem completa seguindo as diretrizes da base de conhecimento. Se estiver fora do horário, mencione isso. Se a base de conhecimento tem instruções específicas para essa situação, SIGA-AS. NUNCA retorne apenas a tag sem texto`;
 
   return prompt;
 }
