@@ -199,25 +199,50 @@ Deno.serve(async (req: Request) => {
       return null;
     }
 
+    function normalizePhoneSuffix(phone: string): string {
+      const digits = (phone || "").replace(/\D/g, "");
+      return digits.length >= 10 ? digits.slice(-10) : digits;
+    }
+
+    function isPhoneRegisteredOnOS(conversaPhone: string, os: any): boolean {
+      const clientSuffix = normalizePhoneSuffix(conversaPhone);
+      if (!clientSuffix || clientSuffix.length < 8) return false;
+      const osTel1 = normalizePhoneSuffix(os.cliente_telefone || "");
+      const osTel2 = normalizePhoneSuffix(os.cliente_telefone_2 || "");
+      return (osTel1.length >= 8 && osTel1.endsWith(clientSuffix.slice(-8))) ||
+             (osTel2.length >= 8 && osTel2.endsWith(clientSuffix.slice(-8)));
+    }
+
     let osVinculada: any = null;
+    let phoneVerified = true;
+    let osFoundButPhoneBlocked = false;
 
     // 1) Try linked OS
     if (conversa.os_id) {
       console.log("[GIA] Conversa has os_id:", conversa.os_id);
       osVinculada = await loadOSDetails(conversa.os_id);
-      if (!osVinculada) console.error("[GIA] FAILED to load OS despite conversa.os_id being set:", conversa.os_id);
+      if (!osVinculada) {
+        console.error("[GIA] FAILED to load OS despite conversa.os_id being set:", conversa.os_id);
+      } else if (!isPhoneRegisteredOnOS(conversa.cliente_telefone, osVinculada)) {
+        console.warn("[GIA] SECURITY: Phone not registered on linked OS.", conversa.cliente_telefone, "OS phones:", osVinculada.cliente_telefone, osVinculada.cliente_telefone_2);
+        phoneVerified = false;
+        osFoundButPhoneBlocked = true;
+      }
     } else {
       console.log("[GIA] Conversa has no os_id, will try phone/number lookup");
     }
 
-    // 2) Try by phone
-    if (!osVinculada && conversa.cliente_telefone) {
+    // 2) Try by phone (no extra verification needed - match itself proves phone is registered)
+    if (!osVinculada && !osFoundButPhoneBlocked && conversa.cliente_telefone) {
       const foundId = await findOSByPhone(conversa.cliente_telefone);
-      if (foundId) osVinculada = await loadOSDetails(foundId);
+      if (foundId) {
+        osVinculada = await loadOSDetails(foundId);
+        phoneVerified = true;
+      }
     }
 
     // 3) Try extracting OS number from message or recent history
-    if (!osVinculada) {
+    if (!osVinculada && !osFoundButPhoneBlocked) {
       const textsToSearch = [mensagem_cliente, ...(history || []).filter((m: any) => !m.from_me).slice(-3).map((m: any) => m.conteudo || "")];
       const allText = textsToSearch.join(" ");
       const candidates: string[] = [];
@@ -229,14 +254,27 @@ Deno.serve(async (req: Request) => {
       for (const candidate of candidates) {
         if (osVinculada) break;
         const foundId = await findOSByNumber(candidate);
-        if (foundId) osVinculada = await loadOSDetails(foundId);
+        if (foundId) {
+          const osData = await loadOSDetails(foundId);
+          if (osData) {
+            if (isPhoneRegisteredOnOS(conversa.cliente_telefone, osData)) {
+              osVinculada = osData;
+              phoneVerified = true;
+              console.log("[GIA] Phone verified for OS found by number:", foundId);
+            } else {
+              console.warn("[GIA] SECURITY: Phone not registered on OS found by number.", conversa.cliente_telefone, "OS phones:", osData.cliente_telefone, osData.cliente_telefone_2);
+              phoneVerified = false;
+              osFoundButPhoneBlocked = true;
+            }
+          }
+        }
       }
     }
 
     const unitKnowledge = (knowledgeResult.data || []).filter((k: any) => !!k);
 
     let orcamentoLink = "";
-    if (osVinculada) {
+    if (osVinculada && phoneVerified) {
       const { data: linkData } = await supabase
         .from("orcamento_links")
         .select("token, status, ativo")
@@ -260,7 +298,7 @@ Deno.serve(async (req: Request) => {
 
     // Load pipeline messages for the OS status
     let pipelineMensagem = "";
-    if (osVinculada?.coluna_kanban) {
+    if (osVinculada?.coluna_kanban && phoneVerified) {
       const { data: pipelineMsgs } = await supabase
         .from("gia_pipeline_mensagens")
         .select("mensagem, tipo_atendimento, tipo_os")
@@ -283,7 +321,8 @@ Deno.serve(async (req: Request) => {
     const clientMsgCount = history.filter((m: any) => !m.from_me).length;
     const hasTemplateSent = history.some((m: any) => m.from_me && m.metadata?.template_name);
 
-    const systemPrompt = buildSystemPrompt(conversa, osVinculada, unitKnowledge, orcamentoLink, pipelineMensagem, clientMsgCount, hasTemplateSent);
+    const osForPrompt = (osVinculada && phoneVerified) ? osVinculada : null;
+    const systemPrompt = buildSystemPrompt(conversa, osForPrompt, unitKnowledge, orcamentoLink, pipelineMensagem, clientMsgCount, hasTemplateSent, osFoundButPhoneBlocked);
 
     const messages: Array<{ role: string; content: string }> = [
       { role: "system", content: systemPrompt },
@@ -374,27 +413,29 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (shouldQueue) {
+    if (shouldQueue || osFoundButPhoneBlocked) {
       await supabase
         .from("atom_connect_conversas")
         .update({ coluna_pipeline: "fila_espera" })
         .eq("id", conversa.id);
-      console.log(`[GIA Atendimento] Conversa ${conversa.id} movida para fila_espera - GIA encaminhou para equipe`);
+      console.log(`[GIA Atendimento] Conversa ${conversa.id} movida para fila_espera - ${osFoundButPhoneBlocked ? 'Telefone não cadastrado na OS' : 'GIA encaminhou para equipe'}`);
     }
 
     // Detect if GIA couldn't find OS or couldn't answer properly
     const osNotFound = !osVinculada && /n[aã]o\s+(consegui|localizei|encontrei|achei)/i.test(cleanResponse);
-    const motivo = shouldQueue
-      ? "GIA encaminhou para equipe"
-      : osNotFound
-        ? "OS não encontrada"
-        : null;
-    const isEscalation = shouldQueue || osNotFound;
+    const motivo = osFoundButPhoneBlocked
+      ? "Telefone não cadastrado na OS"
+      : shouldQueue
+        ? "GIA encaminhou para equipe"
+        : osNotFound
+          ? "OS não encontrada"
+          : null;
+    const isEscalation = shouldQueue || osNotFound || osFoundButPhoneBlocked;
 
     await sendWhatsAppMessage(supabase, conversa, cleanResponse);
     await logInteraction(supabase, conversa, osVinculada, mensagem_cliente, cleanResponse, tokensUsed, isEscalation, motivo, Date.now() - startTime);
 
-    if (osVinculada && !conversa.os_id) {
+    if (osVinculada && phoneVerified && !conversa.os_id) {
       await supabase
         .from("atom_connect_conversas")
         .update({ os_id: osVinculada.id })
@@ -413,7 +454,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string, clientMsgCount?: number, hasTemplateSent?: boolean): string {
+function buildSystemPrompt(conversa: any, os: any, knowledge: any[], orcamentoLink: string, pipelineMensagem?: string, clientMsgCount?: number, hasTemplateSent?: boolean, phoneNotVerified?: boolean): string {
   const nomeCliente = conversa.cliente_nome || "Cliente";
 
   let prompt = `Você é a GIA (Global Intelligence Assistant), assistente virtual de atendimento ao cliente de uma assistência técnica autorizada Samsung.
@@ -528,6 +569,23 @@ Quando o cliente perguntar sobre orçamento ou quiser aprovar, envie este link p
 Diga algo como: "Preparei o link do orçamento para sua aprovação: ${orcamentoLink}"
 `;
     }
+  } else if (phoneNotVerified) {
+    prompt += `
+TELEFONE NÃO CADASTRADO NA OS:
+Foi encontrada uma ordem de serviço, porém este número de telefone (WhatsApp) NÃO está cadastrado nela.
+Por questões de segurança e proteção de dados do cliente, você NÃO PODE compartilhar NENHUMA informação da OS.
+
+Você DEVE:
+1. Informar ao cliente que foi localizada uma ordem de serviço, mas que este número de telefone não está registrado nela
+2. Explicar que por segurança não é possível passar informações da OS para um número não cadastrado
+3. Dizer que está encaminhando a solicitação para a equipe, que vai verificar e entrar em contato
+4. Incluir [ENCAMINHAR_EQUIPE] na resposta
+
+Exemplo de resposta (adapte naturalmente):
+"Olá! Localizei uma ordem de serviço, porém este número de telefone não está cadastrado nela. Por questões de *segurança e proteção de dados*, não consigo compartilhar as informações por aqui. Vou encaminhar sua solicitação para nossa equipe, que vai verificar e te retornar o mais breve possível! [ENCAMINHAR_EQUIPE]"
+
+NUNCA revele o número da OS, status, valores, dados do aparelho ou qualquer outra informação da ordem de serviço.
+`;
   } else {
     prompt += `\nNENHUMA OS VINCULADA: Não encontrei uma ordem de serviço vinculada a este número de telefone. Se o cliente perguntar sobre um serviço específico, peça o número da OS para poder buscar. Caso o cliente já tenha informado o número da OS mas você não tem os dados, diga que não localizou e peça para confirmar o número. NÃO ofereça transferir para atendente humano, tente resolver sozinha.\n`;
   }
