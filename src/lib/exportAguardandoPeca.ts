@@ -109,16 +109,17 @@ export async function exportAguardandoPecaExcel({
     osPecas.forEach((p: any) => {
       allPecas.push({
         descricao: p.descricao || p.codigo || p.pn || 'S/N',
-        valor: p.valor_gspn || 0,
+        valor: parseFloat(p.valor_gspn) || 0,
       });
     });
 
     const requisicoes = os.requisicoes || [];
     requisicoes.forEach((r: any) => {
-      if (!osPecas.some((p: any) => (p.codigo || p.pn) === r.codigo_peca)) {
+      const isDuplicate = osPecas.some((p: any) => (p.codigo || p.pn) === r.codigo_peca);
+      if (!isDuplicate) {
         allPecas.push({
           descricao: r.descricao || r.codigo_peca || 'S/N',
-          valor: r.valor_peca || 0,
+          valor: parseFloat(r.valor_peca) || 0,
         });
       }
     });
