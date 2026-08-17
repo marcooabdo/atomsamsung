@@ -48,7 +48,7 @@ export async function exportAguardandoPecaExcel({
         descricao,
         codigo_peca,
         valor_peca,
-        quantidade_solicitada
+        quantidade_requisitada
       )
     `)
     .eq('coluna_kanban', 'aguardando_peca');
