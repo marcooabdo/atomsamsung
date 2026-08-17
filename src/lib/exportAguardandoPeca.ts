@@ -106,17 +106,37 @@ export async function exportAguardandoPecaExcel({
     const allPecas: { descricao: string; valor: number }[] = [];
 
     const osPecas = os.os_pecas || [];
+    const requisicoes = os.requisicoes || [];
+
+    const reqMap = new Map<string, number>();
+    requisicoes.forEach((r: any) => {
+      const v = parseFloat(r.valor_peca) || 0;
+      if (v > 0) {
+        const key = r.codigo_peca;
+        if (!reqMap.has(key) || v > (reqMap.get(key) || 0)) {
+          reqMap.set(key, v);
+        }
+      }
+    });
+
+    const usedCodes = new Set<string>();
+
     osPecas.forEach((p: any) => {
+      const code = p.codigo || p.pn || '';
+      usedCodes.add(code);
+      const gspn = parseFloat(p.valor_gspn) || 0;
+      const markup = parseFloat(p.valor_unitario) || 0;
+      const fromReq = reqMap.get(code) || 0;
+      const valor = gspn > 0 ? gspn : (fromReq > 0 ? fromReq : markup);
       allPecas.push({
-        descricao: p.descricao || p.codigo || p.pn || 'S/N',
-        valor: parseFloat(p.valor_gspn) || 0,
+        descricao: p.descricao || code || 'S/N',
+        valor,
       });
     });
 
-    const requisicoes = os.requisicoes || [];
     requisicoes.forEach((r: any) => {
-      const isDuplicate = osPecas.some((p: any) => (p.codigo || p.pn) === r.codigo_peca);
-      if (!isDuplicate) {
+      if (!usedCodes.has(r.codigo_peca)) {
+        usedCodes.add(r.codigo_peca);
         allPecas.push({
           descricao: r.descricao || r.codigo_peca || 'S/N',
           valor: parseFloat(r.valor_peca) || 0,
