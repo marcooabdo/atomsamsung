@@ -191,6 +191,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [sendingTemplate, setSendingTemplate] = useState<string | null>(null);
   const [janelaForcadaFechada, setJanelaForcadaFechada] = useState(conversa.janela_fechada_forcada || false);
+  const [localAtendenteId, setLocalAtendenteId] = useState<string | null | undefined>(conversa.atendente_id);
+
+  useEffect(() => {
+    setLocalAtendenteId(conversa.atendente_id);
+  }, [conversa.id, conversa.atendente_id]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -567,6 +572,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         (payload) => {
           const updated = payload.new as Conversa;
           setTypingStatus(updated.cliente_digitando || null);
+          setLocalAtendenteId(updated.atendente_id);
+          onUpdate();
         }
       )
       .subscribe();
@@ -615,21 +622,50 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const loadAtendentes = async () => {
     const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
     if (!targetUnidadeId) return;
-    const { data } = await supabase
-      .from('usuarios')
-      .select('id, nome, foto_url, cargo')
-      .eq('unidade_id', targetUnidadeId)
-      .eq('ativo', true);
 
-    if (data) {
-      const newCache = { ...usersCache };
-      data.forEach(u => { newCache[u.id] = u.nome; });
-      if (usuario?.id && usuario?.nome) {
-        newCache[usuario.id] = usuario.nome;
+    const [primaryRes, additionalRes] = await Promise.all([
+      supabase
+        .from('usuarios')
+        .select('id, nome, foto_url, cargo')
+        .eq('unidade_id', targetUnidadeId)
+        .eq('ativo', true),
+      supabase
+        .from('usuario_unidades')
+        .select('usuario:usuarios!inner(id, nome, foto_url, cargo)')
+        .eq('unidade_id', targetUnidadeId),
+    ]);
+
+    const primaryUsers = primaryRes.data || [];
+    const additionalUsers = (additionalRes.data || [])
+      .map((r: any) => r.usuario)
+      .filter(Boolean);
+
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const u of [...primaryUsers, ...additionalUsers]) {
+      if (!seen.has(u.id)) {
+        seen.add(u.id);
+        merged.push(u);
       }
-      setUsersCache(newCache);
-      setAtendentes(data);
     }
+
+    const atendenteId = localAtendenteId || conversa.atendente_id;
+    if (atendenteId && !seen.has(atendenteId)) {
+      const { data: atendenteUser } = await supabase
+        .from('usuarios')
+        .select('id, nome, foto_url, cargo')
+        .eq('id', atendenteId)
+        .single();
+      if (atendenteUser) merged.push(atendenteUser);
+    }
+
+    const newCache = { ...usersCache };
+    merged.forEach(u => { newCache[u.id] = u.nome; });
+    if (usuario?.id && usuario?.nome) {
+      newCache[usuario.id] = usuario.nome;
+    }
+    setUsersCache(newCache);
+    setAtendentes(merged);
   };
 
   const loadOSData = async () => {
@@ -2038,16 +2074,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               </span>
             )}
 
-            {conversa.atendente_id && conversa.atendente_id !== usuario?.id && (
+            {localAtendenteId && localAtendenteId !== usuario?.id && (
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-amber-500/15 text-amber-400">
                 <User className="w-3 h-3" />
-                {atendentes.find(a => a.id === conversa.atendente_id)?.nome || 'Outro atendente'}
+                {atendentes.find(a => a.id === localAtendenteId)?.nome || 'Outro atendente'}
               </span>
             )}
 
-            {conversa.atendente_id !== usuario?.id && (
+            {localAtendenteId !== usuario?.id && (
               <button
                 onClick={async () => {
+                  setLocalAtendenteId(usuario?.id);
                   await supabase
                     .from('atom_connect_conversas')
                     .update({
@@ -2620,18 +2657,19 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
         {/* Input Area */}
         <div className="flex-shrink-0 p-3" style={{ borderTop: `1px solid ${borderColor}`, background: inputFooterBg }}>
-          {conversa.atendente_id && conversa.atendente_id !== usuario?.id ? (
+          {localAtendenteId && localAtendenteId !== usuario?.id ? (
             <div className="flex items-center gap-3 py-3 px-4 rounded-xl" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium" style={{ color: '#f59e0b' }}>
                   Atendimento em andamento
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: textSecondary }}>
-                  Atendente: {atendentes.find(a => a.id === conversa.atendente_id)?.nome || 'Outro operador'}
+                  Atendente: {atendentes.find(a => a.id === localAtendenteId)?.nome || 'Outro operador'}
                 </p>
               </div>
               <button
                 onClick={async () => {
+                  setLocalAtendenteId(usuario?.id);
                   await supabase
                     .from('atom_connect_conversas')
                     .update({
@@ -2642,7 +2680,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     })
                     .eq('id', conversa.id);
 
-                  const nomeAnterior = atendentes.find(a => a.id === conversa.atendente_id)?.nome || 'outro operador';
+                  const nomeAnterior = atendentes.find(a => a.id === localAtendenteId)?.nome || 'outro operador';
                   await supabase
                     .from('atom_connect_mensagens')
                     .insert({

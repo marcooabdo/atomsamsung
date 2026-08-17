@@ -19,6 +19,7 @@ import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, R
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 import { exportOSFechadasExcel } from '../lib/exportOSFechadas';
+import { exportAguardandoPecaExcel } from '../lib/exportAguardandoPeca';
 
 type OS = Database['public']['Tables']['os']['Row'];
 
@@ -222,6 +223,7 @@ export function Kanban() {
   });
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportingFechadas, setExportingFechadas] = useState(false);
+  const [exportingAguardandoPeca, setExportingAguardandoPeca] = useState(false);
   const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
   const [routePickerOS, setRoutePickerOS] = useState<OS | null>(null);
   const [showConfirmMove, setShowConfirmMove] = useState(false);
@@ -2501,6 +2503,37 @@ export function Kanban() {
                           </h4>
                         </div>
                         <div className="flex items-center gap-1.5">
+                          {coluna.id === 'aguardando_peca' && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (exportingAguardandoPeca) return;
+                                setExportingAguardandoPeca(true);
+                                try {
+                                  const count = await exportAguardandoPecaExcel({
+                                    unidadeId: selectedUnidade || undefined,
+                                    allUserUnits: allUserUnits.length > 0 ? allUserUnits : undefined,
+                                    rotas,
+                                  });
+                                  if (count === 0) alert('Nenhuma OS aguardando peça encontrada.');
+                                } catch (err) {
+                                  console.error(err);
+                                  alert('Erro ao exportar. Tente novamente.');
+                                }
+                                setExportingAguardandoPeca(false);
+                              }}
+                              className="p-1 rounded-lg transition-all hover:scale-110"
+                              style={{
+                                background: exportingAguardandoPeca ? '#6B728020' : '#8B5CF615',
+                                border: `1px solid ${exportingAguardandoPeca ? '#6B728040' : '#8B5CF635'}`,
+                                color: exportingAguardandoPeca ? '#6B7280' : '#8B5CF6'
+                              }}
+                              title="Download Excel - Aguardando Peça"
+                              disabled={exportingAguardandoPeca}
+                            >
+                              <Download className={`w-3 h-3 ${exportingAguardandoPeca ? 'animate-pulse' : ''}`} />
+                            </button>
+                          )}
                           {coluna.id === 'aguardando_peca' && valorTotalAguardandoPeca > 0 && (
                             <button
                               onClick={(e) => {
