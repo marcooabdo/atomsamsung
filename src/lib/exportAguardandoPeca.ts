@@ -108,8 +108,12 @@ export async function exportAguardandoPecaExcel({
     const osPecas = os.os_pecas || [];
     const requisicoes = os.requisicoes || [];
 
+    const activeRequisicoes = requisicoes.filter((r: any) => 
+      r.status !== 'cancelada' && r.status !== 'reprovada'
+    );
+
     const reqMap = new Map<string, number>();
-    requisicoes.forEach((r: any) => {
+    activeRequisicoes.forEach((r: any) => {
       const v = parseFloat(r.valor_peca) || 0;
       if (v > 0) {
         const key = r.codigo_peca;
@@ -134,7 +138,7 @@ export async function exportAguardandoPecaExcel({
       });
     });
 
-    requisicoes.forEach((r: any) => {
+    activeRequisicoes.forEach((r: any) => {
       if (!usedCodes.has(r.codigo_peca)) {
         usedCodes.add(r.codigo_peca);
         allPecas.push({
