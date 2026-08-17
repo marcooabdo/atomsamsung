@@ -109,7 +109,7 @@ export async function exportAguardandoPecaExcel({
     osPecas.forEach((p: any) => {
       allPecas.push({
         descricao: p.descricao || p.codigo || p.pn || 'S/N',
-        valor: p.valor_unitario || p.valor_gspn || 0,
+        valor: p.valor_gspn || 0,
       });
     });
 
