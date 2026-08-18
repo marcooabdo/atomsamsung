@@ -30,6 +30,7 @@ export async function exportAguardandoPecaExcel({
       id,
       numero_os_samsung,
       numero_os_interna,
+      tipo_os,
       tipo_atendimento,
       cliente_cidade,
       aparelho_modelo,
@@ -160,6 +161,7 @@ export async function exportAguardandoPecaExcel({
     return {
       os: os.numero_os_samsung || os.numero_os_interna || '',
       tipoOS: os.numero_os_samsung ? 'Samsung' : 'Interna',
+      lpOw: (os.tipo_os || '').toUpperCase(),
       cidade,
       corRota: rota && rota.cor ? corParaNome(rota.cor) : '',
       tipoAtendimento: (os.tipo_atendimento || '').toUpperCase(),
@@ -173,6 +175,7 @@ export async function exportAguardandoPecaExcel({
     const row: Record<string, any> = {
       'OS': r.os,
       'Tipo': r.tipoOS,
+      'LP/OW': r.lpOw,
       'Cidade': r.cidade,
       'Cor Rota': r.corRota,
       'IH/CI': r.tipoAtendimento,
@@ -195,6 +198,7 @@ export async function exportAguardandoPecaExcel({
   const colWidths = [
     { wch: 18 }, // OS
     { wch: 10 }, // Tipo
+    { wch: 8 },  // LP/OW
     { wch: 20 }, // Cidade
     { wch: 12 }, // Cor Rota
     { wch: 8 },  // IH/CI
