@@ -68,10 +68,19 @@ export async function exportAguardandoPecaExcel({
 
   const unidadeIds = [...new Set(osData.map(os => os.unidade_id).filter(Boolean))];
 
-  const { data: kmData } = await supabase
-    .from('rotas_cidades_km')
-    .select('unidade_id, cidade, distancia_km_ida_volta')
-    .in('unidade_id', unidadeIds);
+  const [{ data: kmData }, { data: unidadesData }] = await Promise.all([
+    supabase
+      .from('rotas_cidades_km')
+      .select('unidade_id, cidade, distancia_km_ida_volta')
+      .in('unidade_id', unidadeIds),
+    supabase
+      .from('unidades')
+      .select('id, nome')
+      .in('id', unidadeIds),
+  ]);
+
+  const unidadeNomeMap = new Map<string, string>();
+  unidadesData?.forEach(u => unidadeNomeMap.set(u.id, u.nome));
 
   const kmMap = new Map<string, number>();
   kmData?.forEach(row => {
@@ -158,10 +167,14 @@ export async function exportAguardandoPecaExcel({
       : '';
     const km = kmKey ? kmMap.get(kmKey) || '' : '';
 
+    const totalPecas = allPecas.reduce((sum, p) => sum + p.valor, 0);
+
     return {
+      unidade: os.unidade_id ? unidadeNomeMap.get(os.unidade_id) || '' : '',
       os: os.numero_os_samsung || os.numero_os_interna || '',
       tipoOS: os.numero_os_samsung ? 'Samsung' : 'Interna',
       lpOw: (os.tipo_os || '').toUpperCase(),
+      totalPecas,
       cidade,
       corRota: rota && rota.cor ? corParaNome(rota.cor) : '',
       tipoAtendimento: (os.tipo_atendimento || '').toUpperCase(),
@@ -173,6 +186,7 @@ export async function exportAguardandoPecaExcel({
 
   const rows = processedRows.map(r => {
     const row: Record<string, any> = {
+      'Unidade': r.unidade,
       'OS': r.os,
       'Tipo': r.tipoOS,
       'LP/OW': r.lpOw,
@@ -189,6 +203,8 @@ export async function exportAguardandoPecaExcel({
       row[`Valor ${i + 1}`] = peca?.valor || '';
     }
 
+    row['Total Peças'] = r.totalPecas > 0 ? r.totalPecas : '';
+
     return row;
   });
 
@@ -196,6 +212,7 @@ export async function exportAguardandoPecaExcel({
   const ws = XLSX.utils.json_to_sheet(rows);
 
   const colWidths = [
+    { wch: 20 }, // Unidade
     { wch: 18 }, // OS
     { wch: 10 }, // Tipo
     { wch: 8 },  // LP/OW
@@ -209,6 +226,7 @@ export async function exportAguardandoPecaExcel({
     colWidths.push({ wch: 30 }); // Peça
     colWidths.push({ wch: 12 }); // Valor
   }
+  colWidths.push({ wch: 14 }); // Total Peças
   ws['!cols'] = colWidths;
 
   XLSX.utils.book_append_sheet(workbook, ws, 'Aguardando Peça');
