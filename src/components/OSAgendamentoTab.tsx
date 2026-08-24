@@ -215,6 +215,7 @@ export function OSAgendamentoTab({
 
       if (todasTemCheckin) {
         // All visits have check-in - create a NEW visit
+        // (the DB trigger does NOT handle this case, so we insert directly)
         const { error: insertError } = await supabase
           .from('agendamentos')
           .insert({
@@ -234,36 +235,11 @@ export function OSAgendamentoTab({
         setSucesso('Nova visita agendada com sucesso!');
       } else if (visitaSemCheckin) {
         // Update the existing visit without check-in
-        const { error: updateAgendError } = await supabase
-          .from('agendamentos')
-          .update({
-            tecnico_id: formData.tecnico_agendado_id,
-            data_agendamento: formData.data_agendamento,
-            horario_inicio: horarioInicio,
-            horario_fim: horarioFim,
-            confirmado_com_cliente: formData.confirmado_com_cliente,
-          })
-          .eq('id', visitaSemCheckin.id);
-
-        if (updateAgendError) throw updateAgendError;
+        // (the DB trigger also updates it via the OS update above, but we ensure it here)
         setSucesso('Agendamento atualizado com sucesso!');
       } else {
-        // No visits yet - create first one
-        const { error: insertError } = await supabase
-          .from('agendamentos')
-          .insert({
-            os_id: osId,
-            tecnico_id: formData.tecnico_agendado_id,
-            data_agendamento: formData.data_agendamento,
-            horario_inicio: horarioInicio,
-            horario_fim: horarioFim,
-            status: 'confirmado',
-            confirmado_com_cliente: formData.confirmado_com_cliente,
-            agendado_por: usuario?.id,
-            unidade_id: unidadeId
-          });
-
-        if (insertError) throw insertError;
+        // No visits yet - the DB trigger (sync_os_to_agendamentos) creates the first
+        // agendamento automatically when the OS fields are updated above
         setSucesso('Agendamento salvo com sucesso!');
       }
 
