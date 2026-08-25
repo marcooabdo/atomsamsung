@@ -3405,6 +3405,16 @@ function ExportModal({ osData, rotas, onClose }: ExportModalProps) {
           row['Última Atualização'] = new Date(os.updated_at).toLocaleString('pt-BR');
         }
 
+        if (exportConfig.comentarios) {
+          const osComments = comentariosData
+            .filter((c: any) => c.os_id === os.id && !c.is_system)
+            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          const lastComment = osComments[0];
+          row['Último Comentário'] = lastComment?.comentario || '';
+          row['Autor Comentário'] = lastComment ? (usuariosMap.get(lastComment.usuario_id) || 'Sistema') : '';
+          row['Data Comentário'] = lastComment ? new Date(lastComment.created_at).toLocaleString('pt-BR') : '';
+        }
+
         return row;
       });
 
