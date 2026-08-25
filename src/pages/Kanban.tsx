@@ -1695,9 +1695,17 @@ export function Kanban() {
       filteredData[col.id] && filteredData[col.id].length > 0
     );
     if (firstColWithResults) {
+      const container = columnsScrollRef.current;
       const colIndex = COLUNAS_KANBAN.findIndex(c => c.id === firstColWithResults.id);
       const columnWidth = 288 + 16; // w-72 (288px) + gap-4 (16px)
-      columnsScrollRef.current.scrollTo({ left: colIndex * columnWidth, behavior: 'smooth' });
+      const colLeft = colIndex * columnWidth;
+      const containerWidth = container.clientWidth;
+      const maxScroll = container.scrollWidth - containerWidth;
+      // Center the column in the viewport
+      let targetScroll = colLeft - (containerWidth / 2) + (288 / 2);
+      // Clamp to valid scroll range
+      targetScroll = Math.max(0, Math.min(targetScroll, maxScroll));
+      container.scrollTo({ left: targetScroll, behavior: 'smooth' });
     } else {
       columnsScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
     }
