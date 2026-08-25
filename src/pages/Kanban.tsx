@@ -3406,13 +3406,16 @@ function ExportModal({ osData, rotas, onClose }: ExportModalProps) {
         }
 
         if (exportConfig.comentarios) {
-          const osComments = comentariosData
-            .filter((c: any) => c.os_id === os.id && !c.is_system)
+          const allOsComments = comentariosData
+            .filter((c: any) => c.os_id === os.id)
             .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          const lastComment = osComments[0];
+          const lastGspn = allOsComments.find((c: any) => c.origem === 'gspn' || c.autor_gspn);
+          const lastInterno = allOsComments.find((c: any) => !c.is_system && c.origem !== 'gspn' && !c.autor_gspn);
+          const lastComment = lastGspn || lastInterno;
           row['Último Comentário'] = lastComment?.comentario || '';
-          row['Autor Comentário'] = lastComment ? (usuariosMap.get(lastComment.usuario_id) || 'Sistema') : '';
-          row['Data Comentário'] = lastComment ? new Date(lastComment.created_at).toLocaleString('pt-BR') : '';
+          row['Autor Comentário'] = lastComment?.autor_gspn || (lastComment ? (usuariosMap.get(lastComment.usuario_id) || 'Sistema') : '');
+          row['Data Comentário'] = lastComment ? new Date(lastComment.data_gspn || lastComment.created_at).toLocaleString('pt-BR') : '';
+          row['Origem Comentário'] = lastGspn ? 'GSPN' : (lastInterno ? 'Interno' : '');
         }
 
         return row;
