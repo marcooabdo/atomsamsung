@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ChatMessage } from './ChatMessage';
-import { Loader } from 'lucide-react';
+import { Loader, Pin, X, ChevronDown } from 'lucide-react';
 
 export interface Message {
   id: string;
@@ -17,30 +17,42 @@ export interface Message {
   edited_at: string | null;
   deleted_at: string | null;
   sender_name: string;
+  sender_photo?: string | null;
   read_by?: string[];
+  pinned_at?: string | null;
+  pinned_by?: string | null;
+  mentioned_user_ids?: string[] | null;
 }
 
 interface ChatMessageListProps {
   conversationId: string;
   userId: string;
   conversationType: string;
+  onEditMessage?: (message: Message) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  onPinMessage?: (messageId: string) => void;
+  currentUserName?: string;
 }
 
 export interface ChatMessageListRef {
   addMessage: (message: Message) => void;
+  scrollToMessage: (messageId: string) => void;
 }
 
-export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType }, ref) => {
+export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType, onEditMessage, onDeleteMessage, onPinMessage, currentUserName }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
+  const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     loadMessages();
+    loadPinnedMessage();
     const channel = subscribeToMessages();
 
     return () => {
@@ -66,8 +78,46 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         return [...prev, message];
       });
       setTimeout(() => scrollToBottom(), 100);
+    },
+    scrollToMessage: (messageId: string) => {
+      setTimeout(() => {
+        const el = document.getElementById(`msg-${messageId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#00D4FF]/50', 'rounded-xl');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-[#00D4FF]/50', 'rounded-xl'), 2000);
+        }
+      }, 200);
     }
   }));
+
+  const loadPinnedMessage = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select(`*, usuarios!chat_messages_sender_id_fkey(nome, foto_url)`)
+        .eq('conversation_id', conversationId)
+        .not('pinned_at', 'is', null)
+        .order('pinned_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) {
+        setPinnedMessage(null);
+        return;
+      }
+
+      const sender = Array.isArray(data.usuarios) ? data.usuarios[0] : data.usuarios;
+      setPinnedMessage({
+        ...data,
+        sender_name: sender?.nome || 'Usuário',
+        sender_photo: sender?.foto_url || null
+      });
+      setShowPinnedBanner(true);
+    } catch {
+      setPinnedMessage(null);
+    }
+  };
 
   const loadMessages = async (before?: string) => {
     try {
@@ -188,6 +238,11 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
           setMessages(prev =>
             prev.map(msg => msg.id === payload.new.id ? { ...msg, ...payload.new } : msg)
           );
+          if (payload.new.pinned_at) {
+            loadPinnedMessage();
+          } else if (pinnedMessage?.id === payload.new.id && !payload.new.pinned_at) {
+            setPinnedMessage(null);
+          }
         }
       )
       .on(
@@ -239,6 +294,17 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
     }
   };
 
+  const scrollToPinnedMessage = () => {
+    if (pinnedMessage) {
+      const el = document.getElementById(`msg-${pinnedMessage.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-[#FFD700]/50', 'rounded-xl');
+        setTimeout(() => el.classList.remove('ring-2', 'ring-[#FFD700]/50', 'rounded-xl'), 2000);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0a1015]">
@@ -248,49 +314,77 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
   }
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      className="flex-1 overflow-y-auto p-4 bg-[#0a1015]"
-    >
-      {loadingMore && (
-        <div className="flex justify-center py-4">
-          <Loader className="w-6 h-6 text-[#00D4FF] animate-spin" />
-        </div>
-      )}
-
-      {messages.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-gray-500">
-          <div className="text-center">
-            <p className="text-sm">Nenhuma mensagem ainda</p>
-            <p className="text-xs mt-1">Envie a primeira mensagem</p>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a1015]">
+      {pinnedMessage && showPinnedBanner && !pinnedMessage.deleted_at && (
+        <div
+          onClick={scrollToPinnedMessage}
+          className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-[#FFD700]/5 to-transparent border-b border-[#FFD700]/20 cursor-pointer hover:bg-[#FFD700]/10 transition-colors"
+        >
+          <Pin className="w-4 h-4 text-[#FFD700] flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-[#FFD700] font-medium">Mensagem fixada</p>
+            <p className="text-xs text-gray-400 truncate">
+              {pinnedMessage.content || (pinnedMessage.message_type === 'image' ? 'Imagem' : 'Arquivo')}
+            </p>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {messages.map((message, index) => {
-            const showSenderName = conversationType === 'group' &&
-              message.sender_id !== userId &&
-              (index === 0 || messages[index - 1].sender_id !== message.sender_id);
-
-            const isGrouped = index > 0 &&
-              messages[index - 1].sender_id === message.sender_id &&
-              new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() < 60000;
-
-            return (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isOwnMessage={message.sender_id === userId}
-                showSenderName={showSenderName}
-                isGrouped={isGrouped}
-                conversationType={conversationType}
-              />
-            );
-          })}
-          <div ref={messagesEndRef} />
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowPinnedBanner(false); }}
+            className="p-1 hover:bg-white/10 rounded"
+          >
+            <X className="w-3.5 h-3.5 text-gray-500" />
+          </button>
         </div>
       )}
+
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4"
+      >
+        {loadingMore && (
+          <div className="flex justify-center py-4">
+            <Loader className="w-6 h-6 text-[#00D4FF] animate-spin" />
+          </div>
+        )}
+
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="text-center">
+              <p className="text-sm">Nenhuma mensagem ainda</p>
+              <p className="text-xs mt-1">Envie a primeira mensagem</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message, index) => {
+              const showSenderName = conversationType === 'group' &&
+                message.sender_id !== userId &&
+                (index === 0 || messages[index - 1].sender_id !== message.sender_id);
+
+              const isGrouped = index > 0 &&
+                messages[index - 1].sender_id === message.sender_id &&
+                new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() < 60000;
+
+              return (
+                <div key={message.id} id={`msg-${message.id}`} className="transition-all duration-300">
+                  <ChatMessage
+                    message={message}
+                    isOwnMessage={message.sender_id === userId}
+                    showSenderName={showSenderName}
+                    isGrouped={isGrouped}
+                    conversationType={conversationType}
+                    onEdit={onEditMessage}
+                    onDelete={onDeleteMessage}
+                    onPin={onPinMessage}
+                    currentUserName={currentUserName}
+                  />
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
     </div>
   );
 });

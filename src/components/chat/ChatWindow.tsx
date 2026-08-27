@@ -1,14 +1,25 @@
-import { useState, useEffect, useRef, DragEvent } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, DragEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessageList, ChatMessageListRef, Message } from './ChatMessageList';
 import { ChatInput, ChatInputRef } from './ChatInput';
 import { Image, FileText, Music } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ChatWindowProps {
   conversationId: string;
   userId: string;
   onBack?: () => void;
+}
+
+export interface ChatWindowRef {
+  scrollToMessage: (messageId: string) => void;
+}
+
+interface Participant {
+  user_id: string;
+  nome: string;
+  foto_url?: string | null;
 }
 
 interface ConversationInfo {
@@ -28,19 +39,30 @@ interface ConversationInfo {
   user_role?: string;
 }
 
-export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) {
+export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversationId, userId, onBack }, ref) => {
+  const { usuario } = useAuth();
   const [conversationInfo, setConversationInfo] = useState<ConversationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const messageListRef = useRef<ChatMessageListRef>(null);
   const dragCounterRef = useRef(0);
   const chatInputRef = useRef<ChatInputRef>(null);
 
+  useImperativeHandle(ref, () => ({
+    scrollToMessage: (messageId: string) => {
+      messageListRef.current?.scrollToMessage(messageId);
+    }
+  }));
+
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setEditingMessage(null);
     loadConversationInfo();
+    loadParticipants();
     markMessagesAsRead();
   }, [conversationId]);
 
@@ -112,6 +134,30 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
     }
   };
 
+  const loadParticipants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_participants')
+        .select('user_id, usuarios(id, nome, foto_url)')
+        .eq('conversation_id', conversationId);
+
+      if (error || !data) return;
+
+      const mapped: Participant[] = data.map(p => {
+        const user = Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios;
+        return {
+          user_id: p.user_id,
+          nome: (user as any)?.nome || 'Usuário',
+          foto_url: (user as any)?.foto_url || null
+        };
+      });
+
+      setParticipants(mapped);
+    } catch {
+      // ignored
+    }
+  };
+
   const markMessagesAsRead = async () => {
     try {
       await supabase.rpc('mark_conversation_as_read', {
@@ -120,6 +166,76 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
       });
     } catch (err) {
       // ignored
+    }
+  };
+
+  const handleEditMessage = (message: Message) => {
+    setEditingMessage({ id: message.id, content: message.content || '' });
+    chatInputRef.current?.focus();
+  };
+
+  const handleEditComplete = async (messageId: string, newContent: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({ content: newContent, edited_at: new Date().toISOString() })
+        .eq('id', messageId)
+        .eq('sender_id', userId);
+
+      if (error) throw error;
+      setEditingMessage(null);
+    } catch {
+      alert('Erro ao editar mensagem');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm('Tem certeza que deseja apagar esta mensagem?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({ deleted_at: new Date().toISOString(), content: null })
+        .eq('id', messageId)
+        .eq('sender_id', userId);
+
+      if (error) throw error;
+    } catch {
+      alert('Erro ao apagar mensagem');
+    }
+  };
+
+  const handlePinMessage = async (messageId: string) => {
+    try {
+      const existingMsg = await supabase
+        .from('chat_messages')
+        .select('pinned_at')
+        .eq('id', messageId)
+        .maybeSingle();
+
+      if (existingMsg.data?.pinned_at) {
+        const { error } = await supabase
+          .from('chat_messages')
+          .update({ pinned_at: null, pinned_by: null })
+          .eq('id', messageId);
+
+        if (error) throw error;
+      } else {
+        await supabase
+          .from('chat_messages')
+          .update({ pinned_at: null, pinned_by: null })
+          .eq('conversation_id', conversationId)
+          .not('pinned_at', 'is', null);
+
+        const { error } = await supabase
+          .from('chat_messages')
+          .update({ pinned_at: new Date().toISOString(), pinned_by: userId })
+          .eq('id', messageId);
+
+        if (error) throw error;
+      }
+    } catch {
+      alert('Erro ao fixar/desafixar mensagem');
     }
   };
 
@@ -225,15 +341,26 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
         conversationId={conversationId}
         userId={userId}
         conversationType={conversationInfo.tipo}
+        onEditMessage={handleEditMessage}
+        onDeleteMessage={handleDeleteMessage}
+        onPinMessage={handlePinMessage}
+        currentUserName={usuario?.nome}
       />
 
       <ChatInput
         ref={chatInputRef}
         conversationId={conversationId}
         userId={userId}
+        userName={usuario?.nome}
         onMessageSent={markMessagesAsRead}
         onMessageAdded={(msg) => messageListRef.current?.addMessage(msg)}
+        editingMessage={editingMessage}
+        onCancelEdit={() => setEditingMessage(null)}
+        onEditComplete={handleEditComplete}
+        participants={participants}
       />
     </div>
   );
-}
+});
+
+ChatWindow.displayName = 'ChatWindow';

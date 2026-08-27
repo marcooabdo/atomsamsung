@@ -1,7 +1,13 @@
 import { useState, useRef, KeyboardEvent, useEffect, DragEvent, ClipboardEvent, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Send, Paperclip, Image, FileText, X, Music } from 'lucide-react';
+import { Send, Paperclip, Image, FileText, X, Music, Pencil } from 'lucide-react';
 import { Message } from './ChatMessageList';
+
+interface Participant {
+  user_id: string;
+  nome: string;
+  foto_url?: string | null;
+}
 
 interface ChatInputProps {
   conversationId: string;
@@ -9,6 +15,10 @@ interface ChatInputProps {
   userName?: string;
   onMessageSent?: () => void;
   onMessageAdded?: (message: Message) => void;
+  editingMessage?: { id: string; content: string } | null;
+  onCancelEdit?: () => void;
+  onEditComplete?: (messageId: string, newContent: string) => void;
+  participants?: Participant[];
 }
 
 interface FilePreview {
@@ -20,35 +30,51 @@ interface FilePreview {
 export interface ChatInputRef {
   prepareImagePreview: (file: File) => void;
   prepareFilePreviews: (files: File[]) => void;
+  focus: () => void;
 }
 
 export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
-  ({ conversationId, userId, onMessageSent, onMessageAdded }, ref) => {
+  ({ conversationId, userId, userName, onMessageSent, onMessageAdded, editingMessage, onCancelEdit, onEditComplete, participants = [] }, ref) => {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [filePreviews, setFilePreviews] = useState<FilePreview[]>([]);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStartPos, setMentionStartPos] = useState<number | null>(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const mentionListRef = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
     prepareImagePreview: (file: File) => prepareFilePreviews([file]),
-    prepareFilePreviews
+    prepareFilePreviews,
+    focus: () => textareaRef.current?.focus()
   }));
 
   useEffect(() => {
-    const handleWindowPaste = (e: any) => {
-      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
-        return;
+    if (editingMessage) {
+      setMessage(editingMessage.content);
+      textareaRef.current?.focus();
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
       }
-    };
+    }
+  }, [editingMessage]);
 
-    window.addEventListener('paste', handleWindowPaste);
-    return () => window.removeEventListener('paste', handleWindowPaste);
-  }, []);
+  const filteredParticipants = participants.filter(p =>
+    p.user_id !== userId &&
+    p.nome.toLowerCase().includes(mentionQuery.toLowerCase())
+  );
+
+  useEffect(() => {
+    setSelectedMentionIndex(0);
+  }, [mentionQuery]);
 
   const handlePaste = async (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -75,19 +101,15 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 
   const validateFile = (file: File): string | null => {
     const fileType = getFileType(file);
-
     if (fileType === 'image' && file.size > 5 * 1024 * 1024) {
       return `${file.name}: Imagem muito grande. Limite: 5MB`;
     }
-
     if (fileType === 'document' && file.size > 10 * 1024 * 1024) {
       return `${file.name}: Documento muito grande. Limite: 10MB`;
     }
-
     if (fileType === 'audio' && file.size > 10 * 1024 * 1024) {
       return `${file.name}: Áudio muito grande. Limite: 10MB`;
     }
-
     return null;
   };
 
@@ -180,21 +202,53 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     setFilePreviews([]);
   };
 
+  const extractMentionedUserIds = (text: string): string[] => {
+    const ids: string[] = [];
+    const mentionRegex = /@[\w\s]+/g;
+    const mentions = text.match(mentionRegex) || [];
+
+    mentions.forEach(mention => {
+      const name = mention.slice(1).trim().toLowerCase();
+      const participant = participants.find(p => p.nome.toLowerCase() === name);
+      if (participant) {
+        ids.push(participant.user_id);
+      }
+    });
+    return ids;
+  };
+
   const handleSendMessage = async () => {
+    if (editingMessage) {
+      if (!message.trim()) return;
+      onEditComplete?.(editingMessage.id, message.trim());
+      setMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+      return;
+    }
+
     if (!message.trim() || sending) return;
 
     const messageContent = message.trim();
+    const mentionedIds = extractMentionedUserIds(messageContent);
     setSending(true);
 
     try {
+      const insertData: any = {
+        conversation_id: conversationId,
+        sender_id: userId,
+        content: messageContent,
+        message_type: 'text'
+      };
+
+      if (mentionedIds.length > 0) {
+        insertData.mentioned_user_ids = mentionedIds;
+      }
+
       const { data, error } = await supabase
         .from('chat_messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: userId,
-          content: messageContent,
-          message_type: 'text'
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -227,19 +281,87 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentions && filteredParticipants.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => Math.min(prev + 1, filteredParticipants.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredParticipants[selectedMentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        return;
+      }
+    }
+
+    if (e.key === 'Escape' && editingMessage) {
+      e.preventDefault();
+      onCancelEdit?.();
+      setMessage('');
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
+  const insertMention = (participant: Participant) => {
+    if (mentionStartPos === null) return;
+
+    const before = message.substring(0, mentionStartPos);
+    const after = message.substring(textareaRef.current?.selectionStart || message.length);
+    const newMessage = `${before}@${participant.nome} ${after}`;
+
+    setMessage(newMessage);
+    setShowMentions(false);
+    setMentionStartPos(null);
+
+    setTimeout(() => {
+      const cursorPos = before.length + participant.nome.length + 2;
+      textareaRef.current?.setSelectionRange(cursorPos, cursorPos);
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    const value = e.target.value;
+    setMessage(value);
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      const hasSpace = textAfterAt.includes('\n');
+
+      if (!hasSpace && (lastAtIndex === 0 || value[lastAtIndex - 1] === ' ' || value[lastAtIndex - 1] === '\n')) {
+        setShowMentions(true);
+        setMentionQuery(textAfterAt);
+        setMentionStartPos(lastAtIndex);
+        return;
+      }
+    }
+
+    setShowMentions(false);
+    setMentionStartPos(null);
   };
 
   const handleFileUpload = async (file: File, messageType: 'image' | 'document' | 'audio') => {
@@ -253,7 +375,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${conversationId}/${fileName}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('chat-files')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -368,11 +490,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             {filePreviews.map((preview, index) => (
               <div key={index} className="flex items-center gap-3 p-2 bg-[#0d1419] rounded-lg border border-[#1a3a4a]/50">
                 {preview.type === 'image' && preview.dataUrl ? (
-                  <img
-                    src={preview.dataUrl}
-                    alt="Preview"
-                    className="w-12 h-12 object-cover rounded border border-[#1a3a4a] flex-shrink-0"
-                  />
+                  <img src={preview.dataUrl} alt="Preview" className="w-12 h-12 object-cover rounded border border-[#1a3a4a] flex-shrink-0" />
                 ) : preview.type === 'document' ? (
                   <div className="w-12 h-12 flex items-center justify-center bg-[#1a3a4a]/30 rounded border border-[#1a3a4a] flex-shrink-0">
                     <FileText className="w-6 h-6 text-[#00D4FF]" />
@@ -389,17 +507,10 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-300 truncate">{preview.file.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {(preview.file.size / 1024).toFixed(1)} KB
-                  </p>
+                  <p className="text-xs text-gray-500">{(preview.file.size / 1024).toFixed(1)} KB</p>
                 </div>
 
-                <button
-                  onClick={() => removeFilePreview(index)}
-                  disabled={uploading}
-                  className="p-1.5 hover:bg-[#1a3a4a]/50 rounded transition-all disabled:opacity-50"
-                  title="Remover"
-                >
+                <button onClick={() => removeFilePreview(index)} disabled={uploading} className="p-1.5 hover:bg-[#1a3a4a]/50 rounded transition-all disabled:opacity-50" title="Remover">
                   <X className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
@@ -417,72 +528,109 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         </div>
       )}
 
-      <div className="flex items-end gap-3">
-        <div className="relative">
-          <button
-            onClick={() => setShowAttachMenu(!showAttachMenu)}
-            disabled={uploading}
-            className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Anexar arquivo"
-          >
-            {showAttachMenu ? (
-              <X className="w-5 h-5 text-gray-400" />
-            ) : (
-              <Paperclip className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />
-            )}
+      {editingMessage && (
+        <div className="mb-3 px-4 py-2 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-[#FFD700]" />
+            <span className="text-sm text-[#FFD700]">Editando mensagem</span>
+          </div>
+          <button onClick={() => { onCancelEdit?.(); setMessage(''); }} className="p-1 hover:bg-white/10 rounded">
+            <X className="w-4 h-4 text-gray-400" />
           </button>
-
-          {showAttachMenu && (
-            <div className="absolute bottom-full left-0 mb-2 bg-[#151f26] border border-[#1a3a4a] rounded-lg overflow-hidden shadow-xl min-w-[180px] z-10">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full"
-              >
-                <Image className="w-5 h-5 text-[#00D4FF]" />
-                <div>
-                  <p className="text-sm font-medium text-gray-200">Foto/Imagem</p>
-                  <p className="text-xs text-gray-500">Até 5MB</p>
-                </div>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-
-              <button
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip';
-                  input.onchange = (e: any) => handleDocumentSelect(e);
-                  input.click();
-                }}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full border-t border-[#1a3a4a]"
-              >
-                <FileText className="w-5 h-5 text-[#00D4FF]" />
-                <div>
-                  <p className="text-sm font-medium text-gray-200">Documento</p>
-                  <p className="text-xs text-gray-500">Até 10MB</p>
-                </div>
-              </button>
-            </div>
-          )}
         </div>
+      )}
+
+      <div className="flex items-end gap-3">
+        {!editingMessage && (
+          <div className="relative">
+            <button
+              onClick={() => setShowAttachMenu(!showAttachMenu)}
+              disabled={uploading}
+              className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Anexar arquivo"
+            >
+              {showAttachMenu ? (
+                <X className="w-5 h-5 text-gray-400" />
+              ) : (
+                <Paperclip className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />
+              )}
+            </button>
+
+            {showAttachMenu && (
+              <div className="absolute bottom-full left-0 mb-2 bg-[#151f26] border border-[#1a3a4a] rounded-lg overflow-hidden shadow-xl min-w-[180px] z-10">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full"
+                >
+                  <Image className="w-5 h-5 text-[#00D4FF]" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-200">Foto/Imagem</p>
+                    <p className="text-xs text-gray-500">Até 5MB</p>
+                  </div>
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.mp4,.mov';
+                    input.onchange = (e: any) => handleDocumentSelect(e);
+                    input.click();
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full border-t border-[#1a3a4a]"
+                >
+                  <FileText className="w-5 h-5 text-[#00D4FF]" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-200">Documento</p>
+                    <p className="text-xs text-gray-500">Até 10MB</p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 relative">
+          {showMentions && filteredParticipants.length > 0 && (
+            <div
+              ref={mentionListRef}
+              className="absolute bottom-full left-0 right-0 mb-2 bg-[#151f26] border border-[#00D4FF]/20 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto z-50"
+              style={{ boxShadow: '0 -8px 32px rgba(0,0,0,0.5)' }}
+            >
+              {filteredParticipants.map((p, i) => (
+                <button
+                  key={p.user_id}
+                  onClick={() => insertMention(p)}
+                  className={`flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors ${
+                    i === selectedMentionIndex ? 'bg-[#00D4FF]/10' : 'hover:bg-[#1a3a4a]/50'
+                  }`}
+                >
+                  <div className="w-7 h-7 rounded-full bg-[#1a3a4a] flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {p.foto_url ? (
+                      <img src={p.foto_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-bold text-[#00D4FF]">{p.nome.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-200">{p.nome}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={message}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="Digite uma mensagem ou cole/arraste arquivos..."
+            placeholder={editingMessage ? 'Editar mensagem...' : 'Digite uma mensagem ou cole/arraste arquivos...'}
             disabled={sending || uploading}
             rows={1}
-            className="w-full px-4 py-2.5 bg-[#151f26] border border-[#1a3a4a]/50 rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/40 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full px-4 py-2.5 bg-[#151f26] border rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed ${
+              editingMessage ? 'border-[#FFD700]/40 focus:border-[#FFD700]/60' : 'border-[#1a3a4a]/50 focus:border-[#00D4FF]/40'
+            }`}
             style={{ maxHeight: '120px' }}
           />
         </div>
@@ -490,10 +638,16 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         <button
           onClick={handleSendMessage}
           disabled={!message.trim() || sending || uploading}
-          className="p-2.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Enviar mensagem"
+          className={`p-2.5 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+            editingMessage ? 'bg-[#FFD700] hover:bg-[#FFD700]/80' : 'bg-[#00D4FF] hover:bg-[#00D4FF]/80'
+          }`}
+          title={editingMessage ? 'Salvar edição' : 'Enviar mensagem'}
         >
-          <Send className="w-5 h-5 text-black" />
+          {editingMessage ? (
+            <Pencil className="w-5 h-5 text-black" />
+          ) : (
+            <Send className="w-5 h-5 text-black" />
+          )}
         </button>
       </div>
     </div>

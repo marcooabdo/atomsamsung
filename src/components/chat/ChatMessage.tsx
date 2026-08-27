@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, CheckCheck, Download, Eye, Image as ImageIcon, FileText, Mic } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -14,6 +14,8 @@ interface Message {
   sender_name: string;
   sender_photo: string | null;
   read_by?: string[];
+  pinned_at?: string | null;
+  mentioned_user_ids?: string[] | null;
 }
 
 interface ChatMessageProps {
@@ -22,10 +24,28 @@ interface ChatMessageProps {
   showSenderName: boolean;
   isGrouped: boolean;
   conversationType: string;
+  onEdit?: (message: Message) => void;
+  onDelete?: (messageId: string) => void;
+  onPin?: (messageId: string) => void;
+  currentUserName?: string;
 }
 
-export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType }: ChatMessageProps) {
+export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, onEdit, onDelete, onPin, currentUserName }: ChatMessageProps) {
   const [showReads, setShowReads] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -34,14 +54,8 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
   const getUserColor = (name: string) => {
     const colors = [
-      '#00D4FF', // Cyan
-      '#39FF14', // Green
-      '#FF6B35', // Orange
-      '#FFD700', // Gold
-      '#FF1493', // Pink
-      '#8A2BE2', // Purple
-      '#00FA9A', // Spring Green
-      '#FF69B4', // Hot Pink
+      '#00D4FF', '#39FF14', '#FF6B35', '#FFD700',
+      '#FF1493', '#8A2BE2', '#00FA9A', '#FF69B4',
     ];
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[hash % colors.length];
@@ -54,12 +68,40 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
   };
 
   const isRead = message.read_by && message.read_by.length > 0;
+  const isDeleted = !!message.deleted_at;
+  const canEdit = isOwnMessage && !isDeleted && message.message_type === 'text';
+  const canDelete = isOwnMessage && !isDeleted;
+  const canPin = !isDeleted;
+
+  const renderMentionHighlightedContent = (text: string) => {
+    const mentionRegex = /@[\w\s]+/g;
+    const parts = text.split(mentionRegex);
+    const mentions = text.match(mentionRegex) || [];
+
+    const result: React.ReactNode[] = [];
+    parts.forEach((part, i) => {
+      result.push(part);
+      if (mentions[i]) {
+        const isSelfMention = currentUserName && mentions[i].slice(1).trim().toLowerCase() === currentUserName.toLowerCase();
+        result.push(
+          <span
+            key={i}
+            className={`font-semibold ${isSelfMention ? 'bg-[#00D4FF]/20 text-[#00D4FF] px-0.5 rounded' : 'text-[#00D4FF]'}`}
+          >
+            {mentions[i]}
+          </span>
+        );
+      }
+    });
+    return result;
+  };
 
   const renderContent = () => {
-    if (message.deleted_at) {
+    if (isDeleted) {
       return (
-        <div className="italic text-gray-500 text-sm">
-          Mensagem removida
+        <div className="italic text-gray-500 text-sm flex items-center gap-1.5">
+          <Trash2 className="w-3.5 h-3.5" />
+          Mensagem apagada
         </div>
       );
     }
@@ -75,7 +117,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
           />
           {message.content && (
             <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">
-              {message.content}
+              {renderMentionHighlightedContent(message.content)}
             </p>
           )}
         </div>
@@ -120,13 +162,13 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
     return (
       <p className="text-sm text-gray-100 whitespace-pre-wrap break-words">
-        {message.content}
+        {message.content ? renderMentionHighlightedContent(message.content) : null}
       </p>
     );
   };
 
   return (
-    <div className={`flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
       {!isOwnMessage && !isGrouped && conversationType === 'group' && (
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-auto mb-1"
@@ -152,7 +194,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
         <div className="w-8"></div>
       )}
 
-      <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+      <div className={`relative max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {showSenderName && (
           <span
             className="text-xs font-bold px-2"
@@ -165,41 +207,95 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
           </span>
         )}
 
-        <div
-          className={`rounded-2xl px-3 py-2 ${
-            isOwnMessage
-              ? 'bg-[#0d2832] rounded-br-sm'
-              : 'bg-[#1a2832] rounded-bl-sm'
-          }`}
-        >
-          {renderContent()}
+        <div className="relative">
+          {!isDeleted && (
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className={`absolute ${isOwnMessage ? '-left-8' : '-right-8'} top-1 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10`}
+            >
+              <MoreVertical className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
 
-          <div className="flex items-center justify-end gap-2 mt-1">
-            {message.edited_at && (
-              <span className="text-[10px] text-gray-500">editada</span>
-            )}
-            <span className="text-[10px] text-gray-500">
-              {formatTime(message.created_at)}
-            </span>
+          {showMenu && (
+            <div
+              ref={menuRef}
+              className={`absolute ${isOwnMessage ? 'right-full mr-2' : 'left-full ml-2'} top-0 z-50 bg-[#1a2832] border border-[#00D4FF]/20 rounded-xl shadow-2xl overflow-hidden min-w-[140px]`}
+              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+            >
+              {canPin && (
+                <button
+                  onClick={() => { onPin?.(message.id); setShowMenu(false); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-200 hover:bg-[#00D4FF]/10 transition-colors"
+                >
+                  <Pin className="w-4 h-4 text-[#00D4FF]" />
+                  {message.pinned_at ? 'Desafixar' : 'Fixar'}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  onClick={() => { onEdit?.(message); setShowMenu(false); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-200 hover:bg-[#00D4FF]/10 transition-colors"
+                >
+                  <Pencil className="w-4 h-4 text-[#00D4FF]" />
+                  Editar
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => { onDelete?.(message.id); setShowMenu(false); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Apagar
+                </button>
+              )}
+            </div>
+          )}
 
-            {isOwnMessage && (
-              <div className="flex items-center">
-                {conversationType === 'group' && isRead ? (
-                  <button
-                    onClick={() => setShowReads(!showReads)}
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <CheckCheck className={`w-3.5 h-3.5 ${isRead ? 'text-[#00D4FF]' : 'text-gray-500'}`} />
-                  </button>
-                ) : (
-                  isRead ? (
-                    <CheckCheck className="w-3.5 h-3.5 text-[#00D4FF]" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5 text-gray-500" />
-                  )
-                )}
+          <div
+            className={`rounded-2xl px-3 py-2 ${
+              isOwnMessage
+                ? 'bg-[#0d2832] rounded-br-sm'
+                : 'bg-[#1a2832] rounded-bl-sm'
+            } ${message.pinned_at ? 'ring-1 ring-[#FFD700]/40' : ''}`}
+          >
+            {message.pinned_at && (
+              <div className="flex items-center gap-1 mb-1">
+                <Pin className="w-3 h-3 text-[#FFD700]" />
+                <span className="text-[10px] text-[#FFD700]">Fixada</span>
               </div>
             )}
+
+            {renderContent()}
+
+            <div className="flex items-center justify-end gap-2 mt-1">
+              {message.edited_at && !isDeleted && (
+                <span className="text-[10px] text-gray-500">editada</span>
+              )}
+              <span className="text-[10px] text-gray-500">
+                {formatTime(message.created_at)}
+              </span>
+
+              {isOwnMessage && (
+                <div className="flex items-center">
+                  {conversationType === 'group' && isRead ? (
+                    <button
+                      onClick={() => setShowReads(!showReads)}
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <CheckCheck className={`w-3.5 h-3.5 ${isRead ? 'text-[#00D4FF]' : 'text-gray-500'}`} />
+                    </button>
+                  ) : (
+                    isRead ? (
+                      <CheckCheck className="w-3.5 h-3.5 text-[#00D4FF]" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5 text-gray-500" />
+                    )
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
