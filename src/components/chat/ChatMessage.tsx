@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin } from 'lucide-react';
+import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin, SmilePlus } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🙏', '🎉'];
+
+interface Reaction {
+  emoji: string;
+  count: number;
+  users: string[];
+  reacted: boolean;
+}
 
 interface Message {
   id: string;
@@ -24,28 +34,82 @@ interface ChatMessageProps {
   showSenderName: boolean;
   isGrouped: boolean;
   conversationType: string;
+  userId: string;
   onEdit?: (message: Message) => void;
   onDelete?: (messageId: string) => void;
   onPin?: (messageId: string) => void;
   currentUserName?: string;
 }
 
-export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, onEdit, onDelete, onPin, currentUserName }: ChatMessageProps) {
+export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, userId, onEdit, onDelete, onPin, currentUserName }: ChatMessageProps) {
   const [showReads, setShowReads] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const reactionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
       }
+      if (reactionRef.current && !reactionRef.current.contains(e.target as Node)) {
+        setShowReactionPicker(false);
+      }
     };
-    if (showMenu) {
+    if (showMenu || showReactionPicker) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMenu]);
+  }, [showMenu, showReactionPicker]);
+
+  useEffect(() => {
+    loadReactions();
+  }, [message.id]);
+
+  const loadReactions = async () => {
+    const { data } = await supabase
+      .from('chat_message_reactions')
+      .select('emoji, user_id, usuarios(nome)')
+      .eq('message_id', message.id);
+
+    if (!data || data.length === 0) {
+      setReactions([]);
+      return;
+    }
+
+    const grouped: Record<string, { count: number; users: string[]; reacted: boolean }> = {};
+    data.forEach((r: any) => {
+      if (!grouped[r.emoji]) {
+        grouped[r.emoji] = { count: 0, users: [], reacted: false };
+      }
+      grouped[r.emoji].count++;
+      const userName = Array.isArray(r.usuarios) ? r.usuarios[0]?.nome : r.usuarios?.nome;
+      if (userName) grouped[r.emoji].users.push(userName);
+      if (r.user_id === userId) grouped[r.emoji].reacted = true;
+    });
+
+    setReactions(Object.entries(grouped).map(([emoji, info]) => ({ emoji, ...info })));
+  };
+
+  const toggleReaction = async (emoji: string) => {
+    const existing = reactions.find(r => r.emoji === emoji && r.reacted);
+    if (existing) {
+      await supabase
+        .from('chat_message_reactions')
+        .delete()
+        .eq('message_id', message.id)
+        .eq('user_id', userId)
+        .eq('emoji', emoji);
+    } else {
+      await supabase
+        .from('chat_message_reactions')
+        .insert({ message_id: message.id, user_id: userId, emoji });
+    }
+    setShowReactionPicker(false);
+    loadReactions();
+  };
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -209,12 +273,39 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
         <div className="relative">
           {!isDeleted && (
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className={`absolute ${isOwnMessage ? '-left-8' : '-right-8'} top-1 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10`}
+            <div className={`absolute ${isOwnMessage ? '-left-16' : '-right-16'} top-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity`}>
+              <button
+                onClick={() => setShowReactionPicker(!showReactionPicker)}
+                className="p-1 rounded-full hover:bg-white/10"
+                title="Reagir"
+              >
+                <SmilePlus className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-1 rounded-full hover:bg-white/10"
+              >
+                <MoreVertical className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+          )}
+
+          {showReactionPicker && (
+            <div
+              ref={reactionRef}
+              className={`absolute ${isOwnMessage ? 'right-0' : 'left-0'} -top-12 z-50 flex gap-1 p-1.5 bg-[#1a2832] border border-[#00D4FF]/20 rounded-full shadow-2xl`}
+              style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.6)' }}
             >
-              <MoreVertical className="w-4 h-4 text-gray-400" />
-            </button>
+              {QUICK_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(emoji)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 hover:scale-125 transition-all text-base"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
           )}
 
           {showMenu && (
@@ -297,6 +388,26 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
               )}
             </div>
           </div>
+
+          {reactions.length > 0 && (
+            <div className={`flex flex-wrap gap-1 mt-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+              {reactions.map(r => (
+                <button
+                  key={r.emoji}
+                  onClick={() => toggleReaction(r.emoji)}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs transition-all ${
+                    r.reacted
+                      ? 'bg-[#00D4FF]/20 border border-[#00D4FF]/40'
+                      : 'bg-[#1a2832] border border-[#1a3a4a] hover:border-[#00D4FF]/30'
+                  }`}
+                  title={r.users.join(', ')}
+                >
+                  <span>{r.emoji}</span>
+                  <span className={`${r.reacted ? 'text-[#00D4FF]' : 'text-gray-400'} font-medium`}>{r.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {showReads && conversationType === 'group' && message.read_by && message.read_by.length > 0 && (

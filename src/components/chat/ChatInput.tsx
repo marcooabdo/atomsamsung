@@ -1,7 +1,22 @@
 import { useState, useRef, KeyboardEvent, useEffect, DragEvent, ClipboardEvent, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Send, Paperclip, Image, FileText, X, Music, Pencil } from 'lucide-react';
+import { Send, Paperclip, Image, FileText, X, Music, Pencil, Smile, Mic, Square } from 'lucide-react';
 import { Message } from './ChatMessageList';
+
+const EMOJI_LIST = [
+  '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😉',
+  '😊','😇','🥰','😍','🤩','😘','😗','😋','😛','😜',
+  '🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐',
+  '😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪',
+  '🤤','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴',
+  '😵','🤯','🤠','🥳','😎','🤓','🧐','😕','😟','🙁',
+  '😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥',
+  '😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱',
+  '😤','😡','😠','🤬','👍','👎','👏','🙌','🤝','🙏',
+  '💪','❤️','🔥','⭐','💯','🎉','🎊','✅','❌','💬',
+  '👋','✌️','🤞','🤟','🤘','👌','🤌','👈','👉','👆',
+  '👇','☝️','✋','🤚','🖐️','🖖','👊','✊','🤛','🤜',
+];
 
 interface Participant {
   user_id: string;
@@ -39,16 +54,24 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [filePreviews, setFilePreviews] = useState<FilePreview[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionStartPos, setMentionStartPos] = useState<number | null>(null);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const mentionListRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useImperativeHandle(ref, () => ({
     prepareImagePreview: (file: File) => prepareFilePreviews([file]),
@@ -67,6 +90,27 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     }
   }, [editingMessage]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
   const filteredParticipants = participants.filter(p =>
     p.user_id !== userId &&
     p.nome.toLowerCase().includes(mentionQuery.toLowerCase())
@@ -75,6 +119,98 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   useEffect(() => {
     setSelectedMentionIndex(0);
   }, [mentionQuery]);
+
+  const insertEmoji = (emoji: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setMessage(prev => prev + emoji);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newMsg = message.substring(0, start) + emoji + message.substring(end);
+    setMessage(newMsg);
+    setShowEmojiPicker(false);
+    setTimeout(() => {
+      const pos = start + emoji.length;
+      textarea.setSelectionRange(pos, pos);
+      textarea.focus();
+    }, 0);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (blob.size < 1000) {
+          setIsRecording(false);
+          setRecordingTime(0);
+          return;
+        }
+        const file = new File([blob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+        setIsRecording(false);
+        setRecordingTime(0);
+        await handleFileUpload(file, 'audio');
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch {
+      alert('Permissao de microfone negada ou indisponivel.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+        }
+      };
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+  };
+
+  const formatRecordingTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   const handlePaste = async (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -453,6 +589,36 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     e.target.value = '';
   };
 
+  if (isRecording) {
+    return (
+      <div className="relative px-4 py-3 border-t border-[#1a3a4a]/50 bg-[#0d1419]">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={cancelRecording}
+            className="p-2.5 hover:bg-red-500/20 rounded-xl transition-all"
+            title="Cancelar"
+          >
+            <X className="w-5 h-5 text-red-400" />
+          </button>
+
+          <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-[#151f26] border border-red-500/30 rounded-xl">
+            <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-sm text-red-400 font-medium">Gravando</span>
+            <span className="text-sm text-gray-400 font-mono">{formatRecordingTime(recordingTime)}</span>
+          </div>
+
+          <button
+            onClick={stopRecording}
+            className="p-2.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 rounded-xl transition-all"
+            title="Enviar audio"
+          >
+            <Send className="w-5 h-5 text-black" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative px-4 py-3 border-t border-[#1a3a4a]/50 bg-[#0d1419]"
@@ -540,55 +706,86 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         </div>
       )}
 
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-2">
         {!editingMessage && (
-          <div className="relative">
-            <button
-              onClick={() => setShowAttachMenu(!showAttachMenu)}
-              disabled={uploading}
-              className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Anexar arquivo"
-            >
-              {showAttachMenu ? (
-                <X className="w-5 h-5 text-gray-400" />
-              ) : (
-                <Paperclip className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />
+          <>
+            <div className="relative" ref={emojiPickerRef}>
+              <button
+                onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowAttachMenu(false); }}
+                className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all"
+                title="Emoji"
+              >
+                <Smile className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />
+              </button>
+
+              {showEmojiPicker && (
+                <div
+                  className="absolute bottom-full left-0 mb-2 bg-[#151f26] border border-[#00D4FF]/20 rounded-xl shadow-2xl z-50 p-3 w-[320px]"
+                  style={{ boxShadow: '0 -8px 32px rgba(0,0,0,0.5)' }}
+                >
+                  <div className="grid grid-cols-8 gap-1 max-h-[240px] overflow-y-auto pr-1">
+                    {EMOJI_LIST.map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => insertEmoji(emoji)}
+                        className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 hover:scale-110 transition-all text-lg"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
 
-            {showAttachMenu && (
-              <div className="absolute bottom-full left-0 mb-2 bg-[#151f26] border border-[#1a3a4a] rounded-lg overflow-hidden shadow-xl min-w-[180px] z-10">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full"
-                >
-                  <Image className="w-5 h-5 text-[#00D4FF]" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-200">Foto/Imagem</p>
-                    <p className="text-xs text-gray-500">Até 5MB</p>
-                  </div>
-                </button>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+            <div className="relative">
+              <button
+                onClick={() => { setShowAttachMenu(!showAttachMenu); setShowEmojiPicker(false); }}
+                disabled={uploading}
+                className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Anexar arquivo"
+              >
+                {showAttachMenu ? (
+                  <X className="w-5 h-5 text-gray-400" />
+                ) : (
+                  <Paperclip className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />
+                )}
+              </button>
 
-                <button
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.mp4,.mov';
-                    input.onchange = (e: any) => handleDocumentSelect(e);
-                    input.click();
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full border-t border-[#1a3a4a]"
-                >
-                  <FileText className="w-5 h-5 text-[#00D4FF]" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-200">Documento</p>
-                    <p className="text-xs text-gray-500">Até 10MB</p>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
+              {showAttachMenu && (
+                <div className="absolute bottom-full left-0 mb-2 bg-[#151f26] border border-[#1a3a4a] rounded-lg overflow-hidden shadow-xl min-w-[180px] z-10">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full"
+                  >
+                    <Image className="w-5 h-5 text-[#00D4FF]" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">Foto/Imagem</p>
+                      <p className="text-xs text-gray-500">Até 5MB</p>
+                    </div>
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.mp4,.mov';
+                      input.onchange = (e: any) => handleDocumentSelect(e);
+                      input.click();
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full border-t border-[#1a3a4a]"
+                  >
+                    <FileText className="w-5 h-5 text-[#00D4FF]" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">Documento</p>
+                      <p className="text-xs text-gray-500">Até 10MB</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         <div className="flex-1 relative">
@@ -649,6 +846,17 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             <Send className="w-5 h-5 text-black" />
           )}
         </button>
+
+        {!editingMessage && (
+          <button
+            onClick={startRecording}
+            disabled={uploading || sending}
+            className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Gravar áudio"
+          >
+            <Mic className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />
+          </button>
+        )}
       </div>
     </div>
   );

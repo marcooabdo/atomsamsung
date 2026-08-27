@@ -373,6 +373,7 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
                     showSenderName={showSenderName}
                     isGrouped={isGrouped}
                     conversationType={conversationType}
+                    userId={userId}
                     onEdit={onEditMessage}
                     onDelete={onDeleteMessage}
                     onPin={onPinMessage}

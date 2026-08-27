@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Users, MessageSquare, AtSign } from 'lucide-react';
+import { Search, Users, MessageSquare, AtSign, Pin } from 'lucide-react';
 import { ProfilePhotoUpload } from '../ProfilePhotoUpload';
 
 interface Conversation {
@@ -10,6 +10,7 @@ interface Conversation {
   foto_url?: string | null;
   unread_count: number;
   participants_count?: number;
+  pinned_at?: string | null;
   last_message: {
     content: string;
     message_type: string;
@@ -61,6 +62,20 @@ export function ChatConversationList({
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [creatingConversation, setCreatingConversation] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; convId: string; isPinned: boolean } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [contextMenu]);
 
   useEffect(() => {
     loadConversations();
@@ -137,14 +152,21 @@ export function ChatConversationList({
 
       const conversationsWithMessages = (data || []).filter(conv => conv.last_message !== null || conv.tipo === 'group');
 
-      const sortedConversations = conversationsWithMessages.sort((a, b) => {
-        const dateA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
-        const dateB = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
-        return dateB - dateA;
+      const { data: pinnedData } = await supabase
+        .from('chat_participants')
+        .select('conversation_id, pinned_at')
+        .eq('user_id', userId)
+        .not('pinned_at', 'is', null);
+
+      const pinnedMap: Record<string, string> = {};
+      (pinnedData || []).forEach((p: any) => {
+        pinnedMap[p.conversation_id] = p.pinned_at;
       });
 
       const enrichedConversations = await Promise.all(
-        sortedConversations.map(async (conv) => {
+        conversationsWithMessages.map(async (conv) => {
+          const base = { ...conv, pinned_at: pinnedMap[conv.id] || null };
+
           if (conv.tipo === 'direct') {
             const { data: participants, error } = await supabase
               .from('chat_participants')
@@ -173,7 +195,7 @@ export function ChatConversationList({
               }
 
               return {
-                ...conv,
+                ...base,
                 other_user: {
                   id: otherUser.id,
                   nome: otherUser.nome,
@@ -190,15 +212,28 @@ export function ChatConversationList({
               .eq('conversation_id', conv.id);
 
             return {
-              ...conv,
+              ...base,
               participants_count: count || 0
             };
           }
-          return conv;
+          return base;
         })
       );
 
-      setConversations(enrichedConversations);
+      const sorted = enrichedConversations.sort((a, b) => {
+        const aPinned = !!a.pinned_at;
+        const bPinned = !!b.pinned_at;
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        if (aPinned && bPinned) {
+          return new Date(a.pinned_at!).getTime() - new Date(b.pinned_at!).getTime();
+        }
+        const dateA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
+        const dateB = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      setConversations(sorted);
     } catch (err) {
     } finally {
       setLoading(false);
@@ -293,6 +328,38 @@ export function ChatConversationList({
     await loadConversations();
   };
 
+  const handleTogglePin = async (conversationId: string, isPinned: boolean) => {
+    setContextMenu(null);
+
+    if (!isPinned) {
+      const pinnedCount = conversations.filter(c => c.pinned_at).length;
+      if (pinnedCount >= 5) {
+        alert('Voce pode fixar no maximo 5 conversas.');
+        return;
+      }
+    }
+
+    const newPinnedAt = isPinned ? null : new Date().toISOString();
+
+    const { error } = await supabase
+      .from('chat_participants')
+      .update({ pinned_at: newPinnedAt })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+
+    if (error) {
+      alert('Erro ao fixar/desafixar conversa.');
+      return;
+    }
+
+    await loadConversations();
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, convId: string, isPinned: boolean) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, convId, isPinned });
+  };
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -327,6 +394,9 @@ export function ChatConversationList({
     const text = `${prefix}${content}`;
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
+
+  const pinnedConversations = conversations.filter(c => c.pinned_at);
+  const unpinnedConversations = conversations.filter(c => !c.pinned_at);
 
   return (
     <div className="flex flex-col h-full bg-[#0d1419]">
@@ -397,82 +467,19 @@ export function ChatConversationList({
             </div>
           ) : (
             <div className="px-3">
-              {conversations.map((conv) => {
-                const displayName = conv.tipo === 'direct' && conv.other_user
-                  ? conv.other_user.nome
-                  : conv.nome;
-
-                return (
-                  <button
-                    key={conv.id}
-                    onClick={() => handleSelectConversation(conv.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 ${
-                      selectedConversationId === conv.id
-                        ? 'bg-[#00D4FF]/10'
-                        : 'hover:bg-[#1a3a4a]/30'
-                    }`}
-                  >
-                    <div className="flex-shrink-0">
-                      {conv.tipo === 'group' ? (
-                        conv.foto_url ? (
-                          <img
-                            src={conv.foto_url}
-                            alt={displayName || 'Grupo'}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-[#1a3a4a]"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
-                            <Users className="w-5 h-5 text-[#00D4FF]" />
-                          </div>
-                        )
-                      ) : (
-                        <ProfilePhotoUpload
-                          userId={conv.other_user?.id || ''}
-                          currentPhotoUrl={conv.other_user?.foto_url || undefined}
-                          userName={displayName || 'U'}
-                          onPhotoUpdated={() => {}}
-                          size="small"
-                          editable={false}
-                        />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-white truncate">
-                            {displayName}
-                          </h3>
-                          {conv.tipo === 'group' && conv.participants_count !== undefined ? (
-                            <p className="text-xs text-gray-500 uppercase mt-0.5">
-                              {conv.participants_count} {conv.participants_count === 1 ? 'participante' : 'participantes'}
-                            </p>
-                          ) : userType !== 'MASTER' && conv.tipo === 'direct' && conv.other_user && (
-                            <p className="text-xs text-gray-500 uppercase mt-0.5">
-                              {conv.other_user.tipo}{conv.other_user.unidade?.cidade ? ` - ${conv.other_user.unidade.cidade}` : ''}
-                            </p>
-                          )}
-                        </div>
-                        {conv.last_message && (
-                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                            {formatTime(conv.last_message.created_at)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-sm text-gray-400 truncate pr-2">
-                          {getMessagePreview(conv)}
-                        </p>
-                        {conv.unread_count > 0 && (
-                          <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-[#00D4FF] text-black text-xs font-bold rounded-full flex items-center justify-center">
-                            {conv.unread_count}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+              {pinnedConversations.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 px-3 py-1.5 mb-1">
+                    <Pin className="w-3 h-3 text-[#FFD700]" />
+                    <span className="text-[10px] font-semibold text-[#FFD700] uppercase tracking-wider">Fixadas</span>
+                  </div>
+                  {pinnedConversations.map((conv) => renderConversationItem(conv))}
+                  {unpinnedConversations.length > 0 && (
+                    <div className="border-b border-[#1a3a4a]/30 my-2" />
+                  )}
+                </>
+              )}
+              {unpinnedConversations.map((conv) => renderConversationItem(conv))}
             </div>
           )
         ) : (
@@ -525,6 +532,107 @@ export function ChatConversationList({
           )
         )}
       </div>
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-[100] bg-[#1a2832] border border-[#00D4FF]/20 rounded-xl shadow-2xl overflow-hidden min-w-[160px]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+          }}
+        >
+          <button
+            onClick={() => handleTogglePin(contextMenu.convId, contextMenu.isPinned)}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-200 hover:bg-[#00D4FF]/10 transition-colors"
+          >
+            <Pin className={`w-4 h-4 ${contextMenu.isPinned ? 'text-gray-400' : 'text-[#FFD700]'}`} />
+            {contextMenu.isPinned ? 'Desafixar' : 'Fixar conversa'}
+          </button>
+        </div>
+      )}
     </div>
   );
+
+  function renderConversationItem(conv: Conversation) {
+    const displayName = conv.tipo === 'direct' && conv.other_user
+      ? conv.other_user.nome
+      : conv.nome;
+
+    return (
+      <button
+        key={conv.id}
+        onClick={() => handleSelectConversation(conv.id)}
+        onContextMenu={(e) => handleContextMenu(e, conv.id, !!conv.pinned_at)}
+        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 ${
+          selectedConversationId === conv.id
+            ? 'bg-[#00D4FF]/10'
+            : 'hover:bg-[#1a3a4a]/30'
+        }`}
+      >
+        <div className="flex-shrink-0">
+          {conv.tipo === 'group' ? (
+            conv.foto_url ? (
+              <img
+                src={conv.foto_url}
+                alt={displayName || 'Grupo'}
+                className="w-12 h-12 rounded-full object-cover border-2 border-[#1a3a4a]"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
+                <Users className="w-5 h-5 text-[#00D4FF]" />
+              </div>
+            )
+          ) : (
+            <ProfilePhotoUpload
+              userId={conv.other_user?.id || ''}
+              currentPhotoUrl={conv.other_user?.foto_url || undefined}
+              userName={displayName || 'U'}
+              onPhotoUpdated={() => {}}
+              size="small"
+              editable={false}
+            />
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+              {conv.pinned_at && (
+                <Pin className="w-3 h-3 text-[#FFD700] flex-shrink-0" />
+              )}
+              <h3 className="font-semibold text-white truncate">
+                {displayName}
+              </h3>
+            </div>
+            {conv.last_message && (
+              <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                {formatTime(conv.last_message.created_at)}
+              </span>
+            )}
+          </div>
+          {conv.tipo === 'group' && conv.participants_count !== undefined ? (
+            <p className="text-xs text-gray-500 uppercase mt-0.5">
+              {conv.participants_count} {conv.participants_count === 1 ? 'participante' : 'participantes'}
+            </p>
+          ) : userType !== 'MASTER' && conv.tipo === 'direct' && conv.other_user && (
+            <p className="text-xs text-gray-500 uppercase mt-0.5">
+              {conv.other_user.tipo}{conv.other_user.unidade?.cidade ? ` - ${conv.other_user.unidade.cidade}` : ''}
+            </p>
+          )}
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm text-gray-400 truncate pr-2">
+              {getMessagePreview(conv)}
+            </p>
+            {conv.unread_count > 0 && (
+              <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-[#00D4FF] text-black text-xs font-bold rounded-full flex items-center justify-center">
+                {conv.unread_count}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  }
 }
