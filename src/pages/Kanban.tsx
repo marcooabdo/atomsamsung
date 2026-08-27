@@ -1876,6 +1876,14 @@ export function Kanban() {
         .update({ arquivada: true, updated_at: new Date().toISOString() })
         .eq('id', os.id);
       if (error) throw error;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: os.id,
+        usuario_id: usuario?.id,
+        comentario: `[SISTEMA] OS arquivada por ${usuario?.nome || 'Usuário'}`,
+        is_system: true,
+      });
+
       setOsData(prev => {
         const next = { ...prev };
         const col = os.coluna_kanban || 'os_fechada';
@@ -1886,7 +1894,7 @@ export function Kanban() {
       setErrorModalData({ title: 'Erro ao Arquivar', message: err?.message || 'Erro desconhecido' });
       setShowErrorModal(true);
     }
-  }, []);
+  }, [usuario]);
 
   const getVisibleColumns = () => {
     const hasSCACCFilter = tipoOSFilters.includes('SC / ACC') || tipoOSFilters.includes('SC') || tipoOSFilters.includes('ACC');
@@ -2733,7 +2741,7 @@ export function Kanban() {
                       onIniciarReparo={handleCardIniciarReparo}
                       onFecharOS={handleCardFecharOS}
                       onMoveOS={handleCardMoveToColumn}
-                      onArchive={usuario?.tipo === 'master' ? handleArchiveOS : undefined}
+                      onArchive={usuario?.tipo === 'master' && coluna.id === 'os_fechada' ? handleArchiveOS : undefined}
                       allColunas={COLUNAS_KANBAN.map(c => ({ id: c.id, label: c.label }))}
                       rotas={rotas}
                       ColumnIcon={coluna.icon}

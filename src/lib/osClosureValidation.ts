@@ -505,6 +505,14 @@ export async function executarFechamentoOS(
 
   await supabase.from('os_alertas_fechamento').update({ resolvido: true, resolvido_em: new Date().toISOString(), resolvido_por: userId }).eq('os_id', osId).eq('resolvido', false);
 
+  const { data: userInfo } = await supabase.from('usuarios').select('nome').eq('id', userId).maybeSingle();
+  await supabase.from('os_comentarios').insert({
+    os_id: osId,
+    usuario_id: userId,
+    comentario: `[SISTEMA] OS fechada por ${userInfo?.nome || 'Usuário'}`,
+    is_system: true,
+  });
+
   return { success: true };
 }
 

@@ -135,7 +135,7 @@ export function ChatConversationList({
 
       if (error) throw error;
 
-      const conversationsWithMessages = (data || []).filter(conv => conv.last_message !== null);
+      const conversationsWithMessages = (data || []).filter(conv => conv.last_message !== null || conv.tipo === 'group');
 
       const sortedConversations = conversationsWithMessages.sort((a, b) => {
         const dateA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
