@@ -362,7 +362,23 @@ export function ChatConversationList({
       return;
     }
 
-    await loadConversations();
+    setConversations(prev => {
+      const updated = prev.map(c =>
+        c.id === conversationId ? { ...c, pinned_at: newPinnedAt } : c
+      );
+      return updated.sort((a, b) => {
+        const aPinned = !!a.pinned_at;
+        const bPinned = !!b.pinned_at;
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        if (aPinned && bPinned) {
+          return new Date(a.pinned_at!).getTime() - new Date(b.pinned_at!).getTime();
+        }
+        const dateA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
+        const dateB = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
+        return dateB - dateA;
+      });
+    });
   };
 
   const handleToggleMute = async (conversationId: string, isMuted: boolean) => {

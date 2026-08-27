@@ -66,6 +66,22 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
   useEffect(() => {
     loadReactions();
+
+    const channel = supabase
+      .channel(`reactions-${message.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_message_reactions',
+        filter: `message_id=eq.${message.id}`
+      }, () => {
+        loadReactions();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [message.id]);
 
   const loadReactions = async () => {
