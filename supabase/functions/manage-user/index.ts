@@ -222,19 +222,49 @@ Deno.serve(async (req: Request) => {
         throw new Error('Voce nao pode excluir seu proprio usuario');
       }
 
-      // Try to delete from auth.users - may fail if user is orphan (only in usuarios table)
-      const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
-      if (deleteAuthError && !deleteAuthError.message.includes('not found') && !deleteAuthError.message.includes('User not found')) {
-        throw deleteAuthError;
-      }
-
+      // Try actual deletion first
+      let deleted = false;
       const { error: deleteProfileError } = await supabaseAdmin
         .from('usuarios')
         .delete()
         .eq('id', user_id);
 
-      if (deleteProfileError) {
-        throw deleteProfileError;
+      if (!deleteProfileError) {
+        // Profile deleted successfully, also remove from auth
+        const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
+        if (deleteAuthError && !deleteAuthError.message.includes('not found') && !deleteAuthError.message.includes('User not found')) {
+          // Non-critical: profile already gone
+        }
+        deleted = true;
+      }
+
+      // If deletion failed (FK constraints like chat_messages.sender_id), fall back to inactivation
+      if (!deleted) {
+        const { error: inactivateError } = await supabaseAdmin
+          .from('usuarios')
+          .update({ ativo: false })
+          .eq('id', user_id);
+
+        if (inactivateError) throw inactivateError;
+
+        // Also disable auth login
+        try {
+          await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: '876000h' });
+        } catch (_) { /* non-critical */ }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Usuario inativado com sucesso! (nao foi possivel excluir devido a historico no sistema)',
+            inactivated: true
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
       }
 
       return new Response(

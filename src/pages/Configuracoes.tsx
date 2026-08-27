@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck, Settings, BarChart3, Search, Download } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck, Settings, BarChart3, Search, Download, UserX, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
@@ -832,7 +832,9 @@ export function Configuracoes() {
         throw new Error(result.error || 'Erro ao excluir usuario');
       }
 
-      setDeleteMessage('Usuário excluído com sucesso!');
+      setDeleteMessage(result.inactivated
+        ? 'Usuário inativado com sucesso! Ele não aparecerá mais no sistema.'
+        : 'Usuário excluído com sucesso!');
       setShowDeleteSuccessModal(true);
       loadData();
     } catch (error: any) {
@@ -840,6 +842,39 @@ export function Configuracoes() {
       setShowDeleteSuccessModal(true);
     } finally {
       setUserToDelete(null);
+    }
+  };
+
+  const handleToggleUserAtivo = async (userId: string, currentAtivo: boolean) => {
+    const newAtivo = !currentAtivo;
+    const actionLabel = newAtivo ? 'reativar' : 'inativar';
+    if (!confirm(`Tem certeza que deseja ${actionLabel} este usuário?`)) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const activeSession = session || (await supabase.auth.refreshSession()).data.session;
+      if (!activeSession?.access_token) {
+        alert('Sessão expirada. Faça login novamente.');
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${activeSession.access_token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ action: 'update', user_id: userId, ativo: newAtivo })
+      });
+
+      const result = await response.json().catch(() => ({ success: false, error: `Erro HTTP ${response.status}` }));
+      if (!response.ok || !result.success) throw new Error(result.error || 'Erro');
+
+      loadData();
+    } catch (error: any) {
+      alert(`Erro ao ${actionLabel} usuário: ${error.message}`);
     }
   };
 
@@ -2223,6 +2258,16 @@ export function Configuracoes() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 ml-4">
+                              <button
+                                onClick={() => handleToggleUserAtivo(usuario.id, usuario.ativo)}
+                                className={`p-2 rounded-lg transition-colors ${usuario.ativo ? 'hover:bg-orange-500/10' : 'hover:bg-green-500/10'}`}
+                                title={usuario.ativo ? 'Inativar usuário' : 'Reativar usuário'}
+                              >
+                                {usuario.ativo
+                                  ? <UserX className="w-4 h-4 text-orange-400" />
+                                  : <UserCheck className="w-4 h-4 text-green-400" />
+                                }
+                              </button>
                               <button onClick={() => handleOpenModal(usuario.id)} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
                                 <Edit className="w-4 h-4 text-[#00D4FF]" />
                               </button>
