@@ -208,13 +208,21 @@ export function ChatConversationList({
               };
             }
           } else if (conv.tipo === 'group') {
-            const { count, error } = await supabase
-              .from('chat_participants')
-              .select('id', { count: 'exact', head: true })
-              .eq('conversation_id', conv.id);
+            const [{ count }, { data: groupData }] = await Promise.all([
+              supabase
+                .from('chat_participants')
+                .select('id', { count: 'exact', head: true })
+                .eq('conversation_id', conv.id),
+              supabase
+                .from('chat_conversations')
+                .select('foto_url')
+                .eq('id', conv.id)
+                .maybeSingle()
+            ]);
 
             return {
               ...base,
+              foto_url: groupData?.foto_url || null,
               participants_count: count || 0
             };
           }

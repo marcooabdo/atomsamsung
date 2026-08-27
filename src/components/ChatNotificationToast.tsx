@@ -58,6 +58,25 @@ export function ChatNotificationToast() {
       mutedConvsRef.current = muted;
     })();
 
+    // Subscribe to mute changes so ref stays current
+    const muteChannel = supabase
+      .channel(`mute-sync-${usuario.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_participants',
+        filter: `user_id=eq.${usuario.id}`
+      }, (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        const convId = row.conversation_id as string;
+        if (row.muted_at) {
+          mutedConvsRef.current.add(convId);
+        } else {
+          mutedConvsRef.current.delete(convId);
+        }
+      })
+      .subscribe();
+
     // Request browser notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().then(p => {
@@ -66,6 +85,10 @@ export function ChatNotificationToast() {
     } else if ('Notification' in window) {
       browserPermissionRef.current = Notification.permission;
     }
+
+    return () => {
+      supabase.removeChannel(muteChannel);
+    };
   }, [usuario?.id]);
 
   const dismissNotification = useCallback((id: string) => {
@@ -97,7 +120,7 @@ export function ChatNotificationToast() {
     navigate('/chat', { state: { openConversationId: notification.conversationId } });
   }, [navigate, dismissNotification]);
 
-  const sendBrowserNotification = useCallback((title: string, body: string, conversationId: string) => {
+  const sendBrowserNotification = useCallback((title: string, body: string, conversationId: string, iconUrl?: string | null) => {
     if (!('Notification' in window)) return;
     if (Notification.permission !== 'granted') return;
     if (document.hasFocus() && location.pathname === '/chat') return;
@@ -105,7 +128,7 @@ export function ChatNotificationToast() {
     try {
       const notif = new Notification(title, {
         body,
-        icon: '/2_-_icone_branco_com_fundo_preto.png',
+        icon: iconUrl || '/2_-_icone_branco_com_fundo_preto.png',
         tag: conversationId,
         renotify: true,
         silent: false,
@@ -153,7 +176,7 @@ export function ChatNotificationToast() {
                 .maybeSingle(),
               supabase
                 .from('chat_conversations')
-                .select('tipo, nome')
+                .select('tipo, nome, foto_url')
                 .eq('id', convId)
                 .maybeSingle(),
             ]);
@@ -171,6 +194,15 @@ export function ChatNotificationToast() {
             const senderPhotoUrl = senderRes.data?.foto_url || null;
             const convType = (convRes.data?.tipo as string) || 'direct';
             const convName = convRes.data?.nome || null;
+            const convPhotoUrl = convRes.data?.foto_url || null;
+
+            // Determine notification icon: sender photo for direct, group photo for groups
+            let notifIcon: string | null = null;
+            if (convType === 'group') {
+              notifIcon = convPhotoUrl || null;
+            } else {
+              notifIcon = senderPhotoUrl || null;
+            }
 
             let preview = '';
             const messageType = msg.message_type as string;
@@ -231,7 +263,7 @@ export function ChatNotificationToast() {
             }
 
             // Browser notification (works even on other tabs/apps)
-            sendBrowserNotification(browserTitle, browserBody, convId);
+            sendBrowserNotification(browserTitle, browserBody, convId, mode === 'minimal' ? null : notifIcon);
           } catch {
             // silently ignore
           }
