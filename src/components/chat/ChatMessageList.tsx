@@ -46,11 +46,13 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
   const [hasMore, setHasMore] = useState(true);
   const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
+  const [historyVisibleFrom, setHistoryVisibleFrom] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
+    loadHistoryLimit();
     loadMessages();
     loadPinnedMessage();
     const channel = subscribeToMessages();
@@ -90,6 +92,21 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
       }, 200);
     }
   }));
+
+  const loadHistoryLimit = async () => {
+    try {
+      const { data } = await supabase
+        .from('chat_participants')
+        .select('history_visible_from')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      setHistoryVisibleFrom(data?.history_visible_from || null);
+    } catch {
+      setHistoryVisibleFrom(null);
+    }
+  };
 
   const loadPinnedMessage = async () => {
     try {
@@ -139,6 +156,10 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
 
       if (before) {
         query = query.lt('created_at', before);
+      }
+
+      if (historyVisibleFrom) {
+        query = query.gte('created_at', historyVisibleFrom);
       }
 
       const { data, error } = await query;

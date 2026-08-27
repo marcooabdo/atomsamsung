@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Users, Search, Check, Trash2, Shield, UserMinus, Camera } from 'lucide-react';
+import { X, Users, Search, Check, Trash2, Shield, UserMinus, Camera, History, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Participant {
@@ -203,14 +203,18 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     }
   };
 
-  const handleAddMember = async (memberId: string) => {
+  const [pendingMember, setPendingMember] = useState<{ id: string; nome: string } | null>(null);
+  const [grantHistory, setGrantHistory] = useState(true);
+
+  const handleAddMember = async (memberId: string, withHistory: boolean) => {
     try {
       const { error } = await supabase
         .from('chat_participants')
         .insert({
           conversation_id: conversationId,
           user_id: memberId,
-          role: 'member'
+          role: 'member',
+          history_visible_from: withHistory ? null : new Date().toISOString()
         });
 
       if (error) throw error;
@@ -222,6 +226,8 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
 
       loadParticipants();
       loadAvailableUsers();
+      setPendingMember(null);
+      setGrantHistory(true);
     } catch (err) {
       alert('Erro ao adicionar membro');
     }
@@ -421,6 +427,64 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
                 Adicionar Membros
               </h3>
 
+              {pendingMember && (
+                <div className="mb-4 p-4 bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg space-y-3">
+                  <p className="text-sm text-gray-200">
+                    Adicionar <span className="font-bold text-[#00D4FF]">{pendingMember.nome}</span> ao grupo:
+                  </p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setGrantHistory(true)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        grantHistory
+                          ? 'bg-[#00D4FF]/15 border-[#00D4FF]/50'
+                          : 'border-gray-700 hover:border-gray-600'
+                      }`}
+                    >
+                      <History className={`w-5 h-5 ${grantHistory ? 'text-[#00D4FF]' : 'text-gray-500'}`} />
+                      <div className="text-left flex-1">
+                        <p className={`text-sm font-semibold ${grantHistory ? 'text-[#00D4FF]' : 'text-gray-300'}`}>
+                          Ver todo o histórico
+                        </p>
+                        <p className="text-xs text-gray-500">O membro terá acesso a todas as mensagens anteriores</p>
+                      </div>
+                      {grantHistory && <Check className="w-4 h-4 text-[#00D4FF]" />}
+                    </button>
+                    <button
+                      onClick={() => setGrantHistory(false)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        !grantHistory
+                          ? 'bg-orange-500/15 border-orange-500/50'
+                          : 'border-gray-700 hover:border-gray-600'
+                      }`}
+                    >
+                      <EyeOff className={`w-5 h-5 ${!grantHistory ? 'text-orange-400' : 'text-gray-500'}`} />
+                      <div className="text-left flex-1">
+                        <p className={`text-sm font-semibold ${!grantHistory ? 'text-orange-400' : 'text-gray-300'}`}>
+                          Sem acesso ao histórico
+                        </p>
+                        <p className="text-xs text-gray-500">O membro só verá mensagens a partir de agora</p>
+                      </div>
+                      {!grantHistory && <Check className="w-4 h-4 text-orange-400" />}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => { setPendingMember(null); setGrantHistory(true); }}
+                      className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm font-semibold transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => handleAddMember(pendingMember.id, grantHistory)}
+                      className="flex-1 px-4 py-2 bg-[#00D4FF] hover:bg-[#00D4FF]/80 text-black rounded-lg text-sm font-semibold transition-all"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
@@ -436,8 +500,12 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
                 {filteredAvailable.map((user) => (
                   <button
                     key={user.id}
-                    onClick={() => handleAddMember(user.id)}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#00D4FF]/5 border border-transparent transition-all"
+                    onClick={() => { setPendingMember({ id: user.id, nome: user.nome }); setGrantHistory(true); }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all border ${
+                      pendingMember?.id === user.id
+                        ? 'bg-[#00D4FF]/10 border-[#00D4FF]/40'
+                        : 'hover:bg-[#00D4FF]/5 border-transparent'
+                    }`}
                   >
                     <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0">
                       <span className="text-[#00D4FF] font-bold">

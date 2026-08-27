@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Users, Search, Check } from 'lucide-react';
+import { X, Users, Search, Check, History, EyeOff } from 'lucide-react';
 
 interface User {
   id: string;
@@ -23,6 +23,7 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
   const [groupDescription, setGroupDescription] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [noHistoryUsers, setNoHistoryUsers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -51,10 +52,23 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
     const newSelected = new Set(selectedUsers);
     if (newSelected.has(id)) {
       newSelected.delete(id);
+      const newNoHistory = new Set(noHistoryUsers);
+      newNoHistory.delete(id);
+      setNoHistoryUsers(newNoHistory);
     } else {
       newSelected.add(id);
     }
     setSelectedUsers(newSelected);
+  };
+
+  const toggleHistory = (id: string) => {
+    const newNoHistory = new Set(noHistoryUsers);
+    if (newNoHistory.has(id)) {
+      newNoHistory.delete(id);
+    } else {
+      newNoHistory.add(id);
+    }
+    setNoHistoryUsers(newNoHistory);
   };
 
   const handleCreate = async () => {
@@ -78,6 +92,15 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
         throw error;
       }
 
+      if (noHistoryUsers.size > 0) {
+        const noHistoryIds = Array.from(noHistoryUsers);
+        await supabase
+          .from('chat_participants')
+          .update({ history_visible_from: new Date().toISOString() })
+          .eq('conversation_id', conversationId)
+          .in('user_id', noHistoryIds);
+      }
+
       onGroupCreated(conversationId);
       handleClose();
     } catch (err) {
@@ -91,6 +114,7 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
     setGroupName('');
     setGroupDescription('');
     setSelectedUsers(new Set());
+    setNoHistoryUsers(new Set());
     setSearchQuery('');
     onClose();
   };
@@ -165,10 +189,32 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
             </div>
 
             {selectedUsers.size > 0 && (
-              <div className="mb-3 p-3 bg-[#00D4FF]/10 rounded-lg border border-[#00D4FF]/30">
+              <div className="mb-3 p-3 bg-[#00D4FF]/10 rounded-lg border border-[#00D4FF]/30 space-y-2">
                 <p className="text-sm text-[#00D4FF] font-semibold">
                   {selectedUsers.size} membro(s) selecionado(s)
                 </p>
+                {Array.from(selectedUsers).map(uid => {
+                  const user = users.find(u => u.id === uid);
+                  if (!user) return null;
+                  const restricted = noHistoryUsers.has(uid);
+                  return (
+                    <div key={uid} className="flex items-center gap-2 py-1.5 px-2 bg-black/30 rounded-lg">
+                      <span className="text-sm text-gray-200 flex-1 truncate">{user.nome}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleHistory(uid); }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                          restricted
+                            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                            : 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/30'
+                        }`}
+                        title={restricted ? 'Sem acesso ao histórico' : 'Com acesso ao histórico'}
+                      >
+                        {restricted ? <EyeOff className="w-3 h-3" /> : <History className="w-3 h-3" />}
+                        {restricted ? 'Sem histórico' : 'Com histórico'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
