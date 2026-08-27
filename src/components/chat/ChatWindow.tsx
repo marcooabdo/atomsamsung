@@ -209,7 +209,7 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
     try {
       const existingMsg = await supabase
         .from('chat_messages')
-        .select('pinned_at')
+        .select('pinned_at, content, message_type')
         .eq('id', messageId)
         .maybeSingle();
 
@@ -220,6 +220,13 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
           .eq('id', messageId);
 
         if (error) throw error;
+
+        await supabase.from('chat_messages').insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          content: `${usuario?.nome || 'Alguém'} desafixou uma mensagem`,
+          message_type: 'system'
+        });
       } else {
         await supabase
           .from('chat_messages')
@@ -233,6 +240,17 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
           .eq('id', messageId);
 
         if (error) throw error;
+
+        const preview = existingMsg.data?.message_type === 'text'
+          ? (existingMsg.data.content?.substring(0, 30) || 'mensagem')
+          : existingMsg.data?.message_type === 'image' ? 'uma foto' : 'um arquivo';
+
+        await supabase.from('chat_messages').insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          content: `${usuario?.nome || 'Alguém'} fixou "${preview}"`,
+          message_type: 'system'
+        });
       }
     } catch {
       alert('Erro ao fixar/desafixar mensagem');

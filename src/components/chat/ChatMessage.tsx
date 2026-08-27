@@ -231,6 +231,16 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
     );
   };
 
+  if (message.message_type === 'system') {
+    return (
+      <div className="flex justify-center py-1">
+        <span className="text-xs text-gray-500 bg-[#151f26] px-3 py-1 rounded-full border border-[#1a3a4a]/40">
+          {message.content}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className={`group flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
       {!isOwnMessage && !isGrouped && conversationType === 'group' && (

@@ -328,6 +328,12 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
             </p>
           </div>
           <button
+            onClick={(e) => { e.stopPropagation(); onPinMessage?.(pinnedMessage.id); }}
+            className="px-2 py-0.5 text-[10px] font-medium text-[#FFD700] hover:bg-[#FFD700]/20 rounded transition-colors"
+          >
+            Desafixar
+          </button>
+          <button
             onClick={(e) => { e.stopPropagation(); setShowPinnedBanner(false); }}
             className="p-1 hover:bg-white/10 rounded"
           >

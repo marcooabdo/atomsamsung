@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatConversationList } from '../components/chat/ChatConversationList';
@@ -6,7 +6,7 @@ import { ChatWindow, ChatWindowRef } from '../components/chat/ChatWindow';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal';
 import { GlobalChatSearch } from '../components/chat/GlobalChatSearch';
 import { supabase } from '../lib/supabase';
-import { Building2, MessageCircle } from 'lucide-react';
+import { Building2, MessageCircle, GripVertical } from 'lucide-react';
 import { useUserPresence } from '../hooks/useUserPresence';
 
 export function Chat() {
@@ -18,7 +18,10 @@ export function Chat() {
   const [isMobile, setIsMobile] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(380);
   const chatWindowRef = useRef<ChatWindowRef>(null);
+  const isResizing = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useUserPresence(usuario?.id);
 
@@ -83,6 +86,31 @@ export function Chat() {
     }
   }, [location.state]);
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current || !containerRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newWidth = e.clientX - containerRect.left;
+      setSidebarWidth(Math.max(260, Math.min(600, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
   if (!usuario) return null;
 
   return (
@@ -115,12 +143,16 @@ export function Chat() {
           </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div ref={containerRef} className="flex-1 flex overflow-hidden">
           <div
             className={`${
               isMobile && selectedConversationId ? 'hidden' : 'flex'
-            } flex-col w-full md:w-[380px] lg:w-[420px] border-r`}
-            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+            } flex-col border-r flex-shrink-0`}
+            style={{
+              background: 'var(--bg-secondary)',
+              borderColor: 'var(--border-primary)',
+              width: isMobile ? '100%' : `${sidebarWidth}px`
+            }}
           >
             <ChatConversationList
               userId={usuario.id}
@@ -132,10 +164,23 @@ export function Chat() {
             />
           </div>
 
+          {!isMobile && (
+            <div
+              onMouseDown={handleMouseDown}
+              className="w-1.5 flex-shrink-0 cursor-col-resize group relative hover:bg-[#00D4FF]/20 transition-colors"
+              style={{ background: 'var(--border-primary)' }}
+            >
+              <div className="absolute inset-y-0 -left-1 -right-1" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <GripVertical className="w-3 h-3 text-[#00D4FF]" />
+              </div>
+            </div>
+          )}
+
           <div
             className={`${
               isMobile && !selectedConversationId ? 'hidden' : 'flex'
-            } flex-1`}
+            } flex-1 min-w-0`}
             style={{ background: 'var(--bg-primary)' }}
           >
             {selectedConversationId ? (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Users, Search, Check, Trash2, Shield, UserMinus, Camera } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Participant {
   id: string;
@@ -18,7 +19,17 @@ interface EditGroupModalProps {
   onUpdate: () => void;
 }
 
+const insertSystemMessage = async (conversationId: string, senderId: string, content: string) => {
+  await supabase.from('chat_messages').insert({
+    conversation_id: conversationId,
+    sender_id: senderId,
+    content,
+    message_type: 'system'
+  });
+};
+
 export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: EditGroupModalProps) {
+  const { usuario } = useAuth();
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [groupPhotoUrl, setGroupPhotoUrl] = useState<string | null>(null);
@@ -192,17 +203,22 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     }
   };
 
-  const handleAddMember = async (userId: string) => {
+  const handleAddMember = async (memberId: string) => {
     try {
       const { error } = await supabase
         .from('chat_participants')
         .insert({
           conversation_id: conversationId,
-          user_id: userId,
+          user_id: memberId,
           role: 'member'
         });
 
       if (error) throw error;
+
+      const { data: addedUser } = await supabase.from('usuarios').select('nome').eq('id', memberId).maybeSingle();
+      if (usuario && addedUser) {
+        await insertSystemMessage(conversationId, usuario.id, `${usuario.nome} adicionou ${addedUser.nome} ao grupo`);
+      }
 
       loadParticipants();
       loadAvailableUsers();
@@ -215,12 +231,18 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     if (!confirm('Remover este membro do grupo?')) return;
 
     try {
+      const removedParticipant = participants.find(p => p.id === participantId);
+
       const { error } = await supabase
         .from('chat_participants')
         .delete()
         .eq('id', participantId);
 
       if (error) throw error;
+
+      if (usuario && removedParticipant) {
+        await insertSystemMessage(conversationId, usuario.id, `${usuario.nome} removeu ${removedParticipant.nome} do grupo`);
+      }
 
       loadParticipants();
       loadAvailableUsers();
