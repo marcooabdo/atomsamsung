@@ -4,6 +4,7 @@ import { EditGroupModal } from './EditGroupModal';
 import { GroupDetailsModal } from './GroupDetailsModal';
 import { ChatDetailsModal } from './ChatDetailsModal';
 import { useOtherUserPresence, formatLastSeen } from '../../hooks/useUserPresence';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ConversationInfo {
   id: string;
@@ -29,6 +30,7 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps) {
+  const { usuario } = useAuth();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showChatDetails, setShowChatDetails] = useState(false);
@@ -61,7 +63,8 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
   };
 
   const isOnline = conversation.tipo === 'direct' && presence?.status === 'online';
-  const canEditGroup = conversation.tipo === 'group' && conversation.user_role === 'admin';
+  const isMaster = usuario?.tipo === 'master';
+  const canEditGroup = conversation.tipo === 'group' && (conversation.user_role === 'admin' || isMaster);
 
   const handleHeaderClick = () => {
     setShowChatDetails(true);

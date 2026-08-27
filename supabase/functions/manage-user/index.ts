@@ -222,8 +222,9 @@ Deno.serve(async (req: Request) => {
         throw new Error('Voce nao pode excluir seu proprio usuario');
       }
 
+      // Try to delete from auth.users - may fail if user is orphan (only in usuarios table)
       const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
-      if (deleteAuthError) {
+      if (deleteAuthError && !deleteAuthError.message.includes('not found') && !deleteAuthError.message.includes('User not found')) {
         throw deleteAuthError;
       }
 
