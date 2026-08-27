@@ -86,8 +86,14 @@ export function ChatNotificationToast() {
       browserPermissionRef.current = Notification.permission;
     }
 
+    const handleModeChange = (e: Event) => {
+      notifModeRef.current = (e as CustomEvent).detail as ChatNotifMode;
+    };
+    window.addEventListener('chat-notif-mode-changed', handleModeChange);
+
     return () => {
       supabase.removeChannel(muteChannel);
+      window.removeEventListener('chat-notif-mode-changed', handleModeChange);
     };
   }, [usuario?.id]);
 
@@ -226,10 +232,14 @@ export function ChatNotificationToast() {
             let browserBody = '';
 
             if (mode === 'minimal') {
-              displayName = 'QG de Comunicacao';
-              displayMessage = 'Nova mensagem';
-              browserTitle = 'QG de Comunicacao';
-              browserBody = 'Voce recebeu uma nova mensagem';
+              displayMessage = 'Enviou uma mensagem';
+              if (convType === 'group' && convName) {
+                browserTitle = convName;
+                browserBody = `${senderName} enviou uma mensagem`;
+              } else {
+                browserTitle = senderName;
+                browserBody = 'Enviou uma mensagem';
+              }
             } else {
               // mode === 'all'
               if (convType === 'group' && convName) {
@@ -246,11 +256,11 @@ export function ChatNotificationToast() {
               const notification: Notification = {
                 id: msg.id as string,
                 senderName: displayName,
-                senderPhotoUrl: mode === 'minimal' ? null : senderPhotoUrl,
+                senderPhotoUrl: senderPhotoUrl,
                 message: displayMessage,
                 conversationId: convId,
                 conversationType: convType,
-                conversationName: mode === 'minimal' ? null : convName,
+                conversationName: convName,
                 timestamp: Date.now(),
               };
 
@@ -263,7 +273,7 @@ export function ChatNotificationToast() {
             }
 
             // Browser notification (works even on other tabs/apps)
-            sendBrowserNotification(browserTitle, browserBody, convId, mode === 'minimal' ? null : notifIcon);
+            sendBrowserNotification(browserTitle, browserBody, convId, notifIcon);
           } catch {
             // silently ignore
           }
@@ -418,6 +428,7 @@ export function ChatNotificationSettings() {
       .from('usuarios')
       .update({ chat_notif_mode: newMode })
       .eq('id', usuario.id);
+    window.dispatchEvent(new CustomEvent('chat-notif-mode-changed', { detail: newMode }));
   };
 
   const handleRequestPermission = async () => {
@@ -454,7 +465,7 @@ export function ChatNotificationSettings() {
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-2">Modo de notificacao</p>
         {[
           { value: 'all' as ChatNotifMode, label: 'Mostrar tudo', desc: 'Nome do remetente e mensagem', icon: Bell },
-          { value: 'minimal' as ChatNotifMode, label: 'Apenas notificar', desc: 'Sem mostrar quem enviou', icon: BellRing },
+          { value: 'minimal' as ChatNotifMode, label: 'Apenas nome', desc: 'Mostra quem enviou, sem conteudo', icon: BellRing },
           { value: 'off' as ChatNotifMode, label: 'Desativado', desc: 'Sem notificacoes', icon: BellOff },
         ].map(opt => (
           <button
