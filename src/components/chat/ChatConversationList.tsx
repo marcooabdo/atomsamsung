@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Users, MessageSquare, AtSign, Pin } from 'lucide-react';
+import { Search, Users, MessageSquare, AtSign, Pin, BellOff, Bell } from 'lucide-react';
 import { ProfilePhotoUpload } from '../ProfilePhotoUpload';
 
 interface Conversation {
@@ -11,6 +11,7 @@ interface Conversation {
   unread_count: number;
   participants_count?: number;
   pinned_at?: string | null;
+  muted_at?: string | null;
   last_message: {
     content: string;
     message_type: string;
@@ -62,7 +63,7 @@ export function ChatConversationList({
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [creatingConversation, setCreatingConversation] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; convId: string; isPinned: boolean } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; convId: string; isPinned: boolean; isMuted: boolean } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -154,18 +155,19 @@ export function ChatConversationList({
 
       const { data: pinnedData } = await supabase
         .from('chat_participants')
-        .select('conversation_id, pinned_at')
-        .eq('user_id', userId)
-        .not('pinned_at', 'is', null);
+        .select('conversation_id, pinned_at, muted_at')
+        .eq('user_id', userId);
 
       const pinnedMap: Record<string, string> = {};
+      const mutedMap: Record<string, string> = {};
       (pinnedData || []).forEach((p: any) => {
-        pinnedMap[p.conversation_id] = p.pinned_at;
+        if (p.pinned_at) pinnedMap[p.conversation_id] = p.pinned_at;
+        if (p.muted_at) mutedMap[p.conversation_id] = p.muted_at;
       });
 
       const enrichedConversations = await Promise.all(
         conversationsWithMessages.map(async (conv) => {
-          const base = { ...conv, pinned_at: pinnedMap[conv.id] || null };
+          const base = { ...conv, pinned_at: pinnedMap[conv.id] || null, muted_at: mutedMap[conv.id] || null };
 
           if (conv.tipo === 'direct') {
             const { data: participants, error } = await supabase
@@ -355,9 +357,20 @@ export function ChatConversationList({
     await loadConversations();
   };
 
-  const handleContextMenu = (e: React.MouseEvent, convId: string, isPinned: boolean) => {
+  const handleToggleMute = async (conversationId: string, isMuted: boolean) => {
+    setContextMenu(null);
+    const { error } = await supabase
+      .from('chat_participants')
+      .update({ muted_at: isMuted ? null : new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+
+    if (!error) await loadConversations();
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, convId: string, isPinned: boolean, isMuted: boolean) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, convId, isPinned });
+    setContextMenu({ x: e.clientX, y: e.clientY, convId, isPinned, isMuted });
   };
 
   const formatTime = (timestamp: string) => {
@@ -550,6 +563,16 @@ export function ChatConversationList({
             <Pin className={`w-4 h-4 ${contextMenu.isPinned ? 'text-gray-400' : 'text-[#FFD700]'}`} />
             {contextMenu.isPinned ? 'Desafixar' : 'Fixar conversa'}
           </button>
+          <button
+            onClick={() => handleToggleMute(contextMenu.convId, contextMenu.isMuted)}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-200 hover:bg-[#00D4FF]/10 transition-colors"
+          >
+            {contextMenu.isMuted
+              ? <Bell className="w-4 h-4 text-green-400" />
+              : <BellOff className="w-4 h-4 text-orange-400" />
+            }
+            {contextMenu.isMuted ? 'Ativar notificacoes' : 'Silenciar'}
+          </button>
         </div>
       )}
     </div>
@@ -564,7 +587,7 @@ export function ChatConversationList({
       <button
         key={conv.id}
         onClick={() => handleSelectConversation(conv.id)}
-        onContextMenu={(e) => handleContextMenu(e, conv.id, !!conv.pinned_at)}
+        onContextMenu={(e) => handleContextMenu(e, conv.id, !!conv.pinned_at, !!conv.muted_at)}
         className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 ${
           selectedConversationId === conv.id
             ? 'bg-[#00D4FF]/10'
@@ -601,6 +624,9 @@ export function ChatConversationList({
             <div className="flex-1 min-w-0 flex items-center gap-1.5">
               {conv.pinned_at && (
                 <Pin className="w-3 h-3 text-[#FFD700] flex-shrink-0" />
+              )}
+              {conv.muted_at && (
+                <BellOff className="w-3 h-3 text-gray-500 flex-shrink-0" />
               )}
               <h3 className="font-semibold text-white truncate">
                 {displayName}

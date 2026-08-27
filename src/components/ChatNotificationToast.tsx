@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, X } from 'lucide-react';
+import { MessageSquare, X, Bell, BellOff, BellRing } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,6 +15,8 @@ interface Notification {
   timestamp: number;
 }
 
+export type ChatNotifMode = 'all' | 'minimal' | 'off';
+
 const NOTIFICATION_DURATION = 5000;
 const MAX_VISIBLE = 3;
 
@@ -25,6 +27,46 @@ export function ChatNotificationToast() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [exiting, setExiting] = useState<Set<string>>(new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const notifModeRef = useRef<ChatNotifMode>('all');
+  const mutedConvsRef = useRef<Set<string>>(new Set());
+  const browserPermissionRef = useRef<NotificationPermission>('default');
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+
+    // Load notification preference
+    (async () => {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('chat_notif_mode')
+        .eq('id', usuario.id)
+        .maybeSingle();
+      if (data?.chat_notif_mode) {
+        notifModeRef.current = data.chat_notif_mode as ChatNotifMode;
+      }
+    })();
+
+    // Load muted conversations
+    (async () => {
+      const { data } = await supabase
+        .from('chat_participants')
+        .select('conversation_id, muted_at')
+        .eq('user_id', usuario.id)
+        .not('muted_at', 'is', null);
+      const muted = new Set<string>();
+      (data || []).forEach((p: any) => muted.add(p.conversation_id));
+      mutedConvsRef.current = muted;
+    })();
+
+    // Request browser notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(p => {
+        browserPermissionRef.current = p;
+      });
+    } else if ('Notification' in window) {
+      browserPermissionRef.current = Notification.permission;
+    }
+  }, [usuario?.id]);
 
   const dismissNotification = useCallback((id: string) => {
     setExiting(prev => new Set(prev).add(id));
@@ -55,6 +97,30 @@ export function ChatNotificationToast() {
     navigate('/chat', { state: { openConversationId: notification.conversationId } });
   }, [navigate, dismissNotification]);
 
+  const sendBrowserNotification = useCallback((title: string, body: string, conversationId: string) => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (document.hasFocus() && location.pathname === '/chat') return;
+
+    try {
+      const notif = new Notification(title, {
+        body,
+        icon: '/2_-_icone_branco_com_fundo_preto.png',
+        tag: conversationId,
+        renotify: true,
+        silent: false,
+      });
+      notif.onclick = () => {
+        window.focus();
+        navigate('/chat', { state: { openConversationId: conversationId } });
+        notif.close();
+      };
+      setTimeout(() => notif.close(), 6000);
+    } catch {
+      // Notification API not fully supported
+    }
+  }, [navigate, location.pathname]);
+
   useEffect(() => {
     if (!usuario?.id) return;
 
@@ -68,7 +134,15 @@ export function ChatNotificationToast() {
           const msg = payload.new as Record<string, unknown>;
 
           if (msg.sender_id === usuario.id) return;
-          if (location.pathname === '/chat') return;
+          if (msg.message_type === 'system') return;
+
+          // Check if conversation is muted
+          const convId = msg.conversation_id as string;
+          if (mutedConvsRef.current.has(convId)) return;
+
+          // Check user notification mode
+          const mode = notifModeRef.current;
+          if (mode === 'off') return;
 
           try {
             const [senderRes, convRes] = await Promise.all([
@@ -80,14 +154,14 @@ export function ChatNotificationToast() {
               supabase
                 .from('chat_conversations')
                 .select('tipo, nome')
-                .eq('id', msg.conversation_id as string)
+                .eq('id', convId)
                 .maybeSingle(),
             ]);
 
             const isParticipant = await supabase
               .from('chat_participants')
               .select('id')
-              .eq('conversation_id', msg.conversation_id as string)
+              .eq('conversation_id', convId)
               .eq('user_id', usuario.id)
               .maybeSingle();
 
@@ -113,23 +187,51 @@ export function ChatNotificationToast() {
               preview = 'Nova mensagem';
             }
 
-            const notification: Notification = {
-              id: msg.id as string,
-              senderName,
-              senderPhotoUrl,
-              message: preview,
-              conversationId: msg.conversation_id as string,
-              conversationType: convType,
-              conversationName: convName,
-              timestamp: Date.now(),
-            };
+            // Build display based on mode
+            let displayName = senderName;
+            let displayMessage = preview;
+            let browserTitle = '';
+            let browserBody = '';
 
-            setNotifications(prev => {
-              const updated = [notification, ...prev];
-              return updated.slice(0, MAX_VISIBLE + 2);
-            });
+            if (mode === 'minimal') {
+              displayName = 'QG de Comunicacao';
+              displayMessage = 'Nova mensagem';
+              browserTitle = 'QG de Comunicacao';
+              browserBody = 'Voce recebeu uma nova mensagem';
+            } else {
+              // mode === 'all'
+              if (convType === 'group' && convName) {
+                browserTitle = convName;
+                browserBody = `${senderName}: ${preview}`;
+              } else {
+                browserTitle = senderName;
+                browserBody = preview;
+              }
+            }
 
-            scheduleRemoval(notification.id);
+            // In-app toast (only when on chat page skip)
+            if (location.pathname !== '/chat') {
+              const notification: Notification = {
+                id: msg.id as string,
+                senderName: displayName,
+                senderPhotoUrl: mode === 'minimal' ? null : senderPhotoUrl,
+                message: displayMessage,
+                conversationId: convId,
+                conversationType: convType,
+                conversationName: mode === 'minimal' ? null : convName,
+                timestamp: Date.now(),
+              };
+
+              setNotifications(prev => {
+                const updated = [notification, ...prev];
+                return updated.slice(0, MAX_VISIBLE + 2);
+              });
+
+              scheduleRemoval(notification.id);
+            }
+
+            // Browser notification (works even on other tabs/apps)
+            sendBrowserNotification(browserTitle, browserBody, convId);
           } catch {
             // silently ignore
           }
@@ -142,7 +244,7 @@ export function ChatNotificationToast() {
       timersRef.current.forEach(timer => clearTimeout(timer));
       timersRef.current.clear();
     };
-  }, [usuario?.id, location.pathname, scheduleRemoval]);
+  }, [usuario?.id, location.pathname, scheduleRemoval, sendBrowserNotification]);
 
   const visible = notifications.slice(0, MAX_VISIBLE);
 
@@ -159,7 +261,7 @@ export function ChatNotificationToast() {
 
   return (
     <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: '380px', width: '100%' }}>
-      {visible.map((notification, index) => {
+      {visible.map((notification) => {
         const isExiting = exiting.has(notification.id);
         const accentColor = getUserColor(notification.senderName);
 
@@ -250,6 +352,98 @@ export function ChatNotificationToast() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function ChatNotificationSettings() {
+  const { usuario } = useAuth();
+  const [mode, setMode] = useState<ChatNotifMode>('all');
+  const [loading, setLoading] = useState(true);
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('chat_notif_mode')
+        .eq('id', usuario.id)
+        .maybeSingle();
+      if (data?.chat_notif_mode) setMode(data.chat_notif_mode as ChatNotifMode);
+      setLoading(false);
+    })();
+
+    if ('Notification' in window) {
+      setBrowserPermission(Notification.permission);
+    }
+  }, [usuario?.id]);
+
+  const handleChangeMode = async (newMode: ChatNotifMode) => {
+    if (!usuario?.id) return;
+    setMode(newMode);
+    await supabase
+      .from('usuarios')
+      .update({ chat_notif_mode: newMode })
+      .eq('id', usuario.id);
+  };
+
+  const handleRequestPermission = async () => {
+    if (!('Notification' in window)) return;
+    const permission = await Notification.requestPermission();
+    setBrowserPermission(permission);
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="space-y-4">
+      {browserPermission !== 'granted' && (
+        <div className="bg-[#1a3a4a]/50 border border-[#00D4FF]/20 rounded-xl p-3">
+          <p className="text-xs text-gray-400 mb-2">
+            Para receber notificacoes mesmo em outras abas ou programas, ative as notificacoes do navegador.
+          </p>
+          <button
+            onClick={handleRequestPermission}
+            className="flex items-center gap-2 px-3 py-1.5 bg-[#00D4FF]/20 text-[#00D4FF] rounded-lg text-xs font-medium hover:bg-[#00D4FF]/30 transition-colors"
+          >
+            <BellRing className="w-3.5 h-3.5" />
+            Ativar notificacoes do navegador
+          </button>
+          {browserPermission === 'denied' && (
+            <p className="text-[10px] text-red-400 mt-1.5">
+              Notificacoes bloqueadas. Altere nas configuracoes do navegador.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-2">Modo de notificacao</p>
+        {[
+          { value: 'all' as ChatNotifMode, label: 'Mostrar tudo', desc: 'Nome do remetente e mensagem', icon: Bell },
+          { value: 'minimal' as ChatNotifMode, label: 'Apenas notificar', desc: 'Sem mostrar quem enviou', icon: BellRing },
+          { value: 'off' as ChatNotifMode, label: 'Desativado', desc: 'Sem notificacoes', icon: BellOff },
+        ].map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => handleChangeMode(opt.value)}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left ${
+              mode === opt.value
+                ? 'bg-[#00D4FF]/10 border border-[#00D4FF]/30'
+                : 'bg-[#0a1218]/50 border border-transparent hover:border-[#1a3a4a]/50'
+            }`}
+          >
+            <opt.icon className={`w-4 h-4 ${mode === opt.value ? 'text-[#00D4FF]' : 'text-gray-500'}`} />
+            <div>
+              <p className={`text-sm font-medium ${mode === opt.value ? 'text-white' : 'text-gray-300'}`}>
+                {opt.label}
+              </p>
+              <p className="text-[10px] text-gray-500">{opt.desc}</p>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { ChatWindow, ChatWindowRef } from '../components/chat/ChatWindow';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal';
 import { GlobalChatSearch } from '../components/chat/GlobalChatSearch';
 import { supabase } from '../lib/supabase';
-import { Building2, MessageCircle, GripVertical } from 'lucide-react';
+import { Building2, MessageCircle, GripVertical, Bell, X } from 'lucide-react';
+import { ChatNotificationSettings } from '../components/ChatNotificationToast';
 import { useUserPresence } from '../hooks/useUserPresence';
 
 export function Chat() {
@@ -19,6 +20,7 @@ export function Chat() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(380);
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
   const chatWindowRef = useRef<ChatWindowRef>(null);
   const isResizing = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,11 +137,33 @@ export function Chat() {
               <span className="font-medium text-sm">Chat</span>
             </button>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ border: '1px solid rgba(var(--accent-rgb), 0.3)', background: 'rgba(var(--accent-rgb), 0.08)' }}>
-            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--text-accent)' }}></div>
-            <span className="text-sm font-medium" style={{ color: 'var(--text-accent)' }}>
-              {onlineCount} online
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifSettings(!showNotifSettings)}
+                className="p-2 rounded-lg transition-colors hover:bg-white/5"
+                title="Configuracoes de notificacao"
+              >
+                <Bell className="w-4.5 h-4.5" style={{ color: 'var(--text-secondary)' }} />
+              </button>
+              {showNotifSettings && (
+                <div className="absolute right-0 top-full mt-2 w-[300px] rounded-2xl border p-4 z-50 shadow-2xl" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Notificacoes</h4>
+                    <button onClick={() => setShowNotifSettings(false)} className="p-1 rounded hover:bg-white/10">
+                      <X className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+                    </button>
+                  </div>
+                  <ChatNotificationSettings />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ border: '1px solid rgba(var(--accent-rgb), 0.3)', background: 'rgba(var(--accent-rgb), 0.08)' }}>
+              <div className="w-2 h-2 rounded-full" style={{ background: 'var(--text-accent)' }}></div>
+              <span className="text-sm font-medium" style={{ color: 'var(--text-accent)' }}>
+                {onlineCount} online
+              </span>
+            </div>
           </div>
         </div>
 
