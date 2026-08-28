@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin, SmilePlus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { ChatUserProfileModal } from './ChatUserProfileModal';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🙏', '🎉'];
 
@@ -21,6 +22,7 @@ interface Message {
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
+  sender_id: string;
   sender_name: string;
   sender_photo: string | null;
   read_by?: string[];
@@ -43,6 +45,7 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, userId, onEdit, onDelete, onPin, currentUserName }: ChatMessageProps) {
   const [showReads, setShowReads] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [reactions, setReactions] = useState<Reaction[]>([]);
@@ -258,10 +261,12 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
   }
 
   return (
+    <>
     <div className={`group flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
       {!isOwnMessage && !isGrouped && conversationType === 'group' && (
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-auto mb-1"
+        <button
+          onClick={() => setShowProfile(true)}
+          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-auto mb-1 cursor-pointer hover:ring-2 hover:ring-[#00D4FF]/40 transition-all"
           style={{
             backgroundColor: `${getUserColor(message.sender_name)}20`,
             border: `2px solid ${getUserColor(message.sender_name)}60`
@@ -277,7 +282,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
               {message.sender_name.charAt(0).toUpperCase()}
             </span>
           )}
-        </div>
+        </button>
       )}
 
       {!isOwnMessage && isGrouped && conversationType === 'group' && (
@@ -286,15 +291,16 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
       <div className={`relative max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {showSenderName && (
-          <span
-            className="text-xs font-bold px-2"
+          <button
+            onClick={() => setShowProfile(true)}
+            className="text-xs font-bold px-2 hover:underline cursor-pointer text-left"
             style={{
               color: getUserColor(message.sender_name),
               textShadow: `0 0 10px ${getUserColor(message.sender_name)}60`
             }}
           >
             {message.sender_name}
-          </span>
+          </button>
         )}
 
         <div className="relative">
@@ -446,5 +452,13 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
         )}
       </div>
     </div>
+
+      {showProfile && (
+        <ChatUserProfileModal
+          userId={message.sender_id}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
+    </>
   );
 }
