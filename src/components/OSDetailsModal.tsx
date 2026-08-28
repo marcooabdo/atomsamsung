@@ -1,4 +1,4 @@
-import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route, AlertTriangle, History } from 'lucide-react';
+import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route, AlertTriangle, History, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
@@ -40,6 +40,7 @@ interface OSDetails {
   coluna_kanban: string;
   cliente_nome: string;
   cliente_telefone: string | null;
+  cliente_telefone_2: string | null;
   cliente_email: string | null;
   cliente_cep: string | null;
   cliente_logradouro: string | null;
@@ -127,6 +128,19 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [rotas, setRotas] = useState<Array<{ id: string; nome: string; coluna_kanban: string; cor: string; cidades: string[] }>>([]);
   const [showKmModal, setShowKmModal] = useState(false);
   const [kmInput, setKmInput] = useState('');
+  const [editingTel2, setEditingTel2] = useState(false);
+  const [tel2Value, setTel2Value] = useState('');
+  const [savingTel2, setSavingTel2] = useState(false);
+
+  const handleSaveTel2 = async () => {
+    if (!osDetails) return;
+    setSavingTel2(true);
+    const val = tel2Value.trim() || null;
+    await supabase.from('os').update({ cliente_telefone_2: val }).eq('id', osDetails.id);
+    setOsDetails({ ...osDetails, cliente_telefone_2: val });
+    setEditingTel2(false);
+    setSavingTel2(false);
+  };
 
   const themeAccent = themeInfo.accent;
   const modalBg = isDark ? themeInfo.bg : '#ffffff';
@@ -685,6 +699,48 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                       <p className="font-medium" style={{ color: textPrimary }}>{osDetails.cliente_telefone}</p>
                     </div>
                   )}
+                  <div>
+                    <span style={{ color: textSecondary }}>Telefone 2:</span>
+                    {editingTel2 ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={tel2Value}
+                          onChange={(e) => setTel2Value(e.target.value)}
+                          placeholder="(00) 00000-0000"
+                          className="flex-1 px-2 py-1 text-sm rounded border outline-none"
+                          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)', color: textPrimary }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleSaveTel2}
+                          disabled={savingTel2}
+                          className="p-1 rounded hover:bg-green-500/20 text-green-400"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingTel2(false)}
+                          className="p-1 rounded hover:bg-red-500/20 text-red-400"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium" style={{ color: textPrimary }}>
+                          {osDetails.cliente_telefone_2 || '-'}
+                        </p>
+                        <button
+                          onClick={() => { setTel2Value(osDetails.cliente_telefone_2 || ''); setEditingTel2(true); }}
+                          className="p-1 rounded hover:bg-white/10"
+                          title="Editar Telefone 2"
+                        >
+                          <Pencil className="w-3.5 h-3.5" style={{ color: textSecondary }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   {osDetails.cliente_email && (
                     <div>
                       <span style={{ color: textSecondary }}>Email:</span>
