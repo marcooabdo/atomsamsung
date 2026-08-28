@@ -952,7 +952,7 @@ async function processMessage(
 
   let { data: conversa } = await supabase
     .from("atom_connect_conversas")
-    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno, aguardando_avaliacao, regra_finalizacao_id, avaliacao_enviada_at, is_bot_ativo")
+    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno, aguardando_avaliacao, regra_finalizacao_id, avaliacao_enviada_at, is_bot_ativo, atendente_id")
     .eq("cliente_telefone", phoneNumber)
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
@@ -961,7 +961,7 @@ async function processMessage(
     const without9 = "55" + phoneNumber.substring(2, 4) + phoneNumber.substring(5);
     const { data: altConversa } = await supabase
       .from("atom_connect_conversas")
-      .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno, aguardando_avaliacao, regra_finalizacao_id, avaliacao_enviada_at, is_bot_ativo")
+      .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno, aguardando_avaliacao, regra_finalizacao_id, avaliacao_enviada_at, is_bot_ativo, atendente_id")
       .eq("cliente_telefone", without9)
       .eq("unidade_id", instancia.unidade_id)
       .maybeSingle();
@@ -1464,12 +1464,15 @@ async function processMessage(
           } else if (firstColumn) {
             // Not awaiting rating (already answered or timeout already fired) — reopen
             updateData.coluna_pipeline = firstColumn.id;
-            updateData.is_bot_ativo = true;
-            updateData.atendente_id = null;
             updateData.regra_finalizacao_id = null;
+            // Only re-enable bot if no human operator was assigned
+            if (!conversa.atendente_id) {
+              updateData.is_bot_ativo = true;
+              updateData.atendente_id = null;
+            }
           }
-        } else if (firstColumn && conversa.coluna_pipeline === firstColumn.id) {
-          // Conversation is in the first column (bot/triagem) — ensure bot is active
+        } else if (firstColumn && conversa.coluna_pipeline === firstColumn.id && !conversa.atendente_id) {
+          // Conversation is in the first column (bot/triagem) and no operator assigned — ensure bot is active
           updateData.is_bot_ativo = true;
         }
       }
