@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone, Layers, Link2, ChevronRight, Pencil, History } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone, Layers, Link2, ChevronRight, Pencil, History, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getStoragePublicUrl } from '../lib/storageUtils';
 import { normalizarCidade } from '../lib/cidadeNormalize';
@@ -267,6 +267,9 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
   const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
   const [whatsAppConversa, setWhatsAppConversa] = useState<WhatsAppConversa | null>(null);
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+  const [editingTel2, setEditingTel2] = useState(false);
+  const [tel2Value, setTel2Value] = useState('');
+  const [savingTel2, setSavingTel2] = useState(false);
   const [whatsAppError, setWhatsAppError] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
@@ -4661,17 +4664,59 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       </div>
                       <div>
                         <label className="text-xs text-gray-500 uppercase">Telefone 2</label>
-                        {os.cliente_telefone_2 ? (
-                          <button
-                            onClick={() => handlePhoneClick(os.cliente_telefone_2)}
-                            disabled={loadingWhatsApp}
-                            className="flex items-center gap-1.5 mt-1 px-2 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-sm text-green-400 transition-colors disabled:opacity-50"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                            <span>{os.cliente_telefone_2}</span>
-                          </button>
+                        {editingTel2 ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="text"
+                              value={tel2Value}
+                              onChange={(e) => setTel2Value(e.target.value)}
+                              placeholder="(00) 00000-0000"
+                              className="flex-1 px-2 py-1 text-sm rounded border border-gray-600 bg-gray-800 text-white outline-none focus:border-blue-500"
+                              autoFocus
+                            />
+                            <button
+                              onClick={async () => {
+                                setSavingTel2(true);
+                                const val = tel2Value.trim() || null;
+                                await supabase.from('os').update({ cliente_telefone_2: val }).eq('id', os.id);
+                                setOs({ ...os, cliente_telefone_2: val });
+                                setEditingTel2(false);
+                                setSavingTel2(false);
+                              }}
+                              disabled={savingTel2}
+                              className="p-1 rounded hover:bg-green-500/20 text-green-400"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setEditingTel2(false)}
+                              className="p-1 rounded hover:bg-red-500/20 text-red-400"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         ) : (
-                          <p className="text-sm text-gray-300 mt-1">-</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {os.cliente_telefone_2 ? (
+                              <button
+                                onClick={() => handlePhoneClick(os.cliente_telefone_2)}
+                                disabled={loadingWhatsApp}
+                                className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-sm text-green-400 transition-colors disabled:opacity-50"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>{os.cliente_telefone_2}</span>
+                              </button>
+                            ) : (
+                              <p className="text-sm text-gray-300">-</p>
+                            )}
+                            <button
+                              onClick={() => { setTel2Value(os.cliente_telefone_2 || ''); setEditingTel2(true); }}
+                              className="p-1 rounded hover:bg-white/10"
+                              title="Editar Telefone 2"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-gray-400" />
+                            </button>
+                          </div>
                         )}
                       </div>
                       <div>
