@@ -30,6 +30,7 @@ export function ChatNotificationToast() {
   const notifModeRef = useRef<ChatNotifMode>('all');
   const mutedConvsRef = useRef<Set<string>>(new Set());
   const browserPermissionRef = useRef<NotificationPermission>('default');
+  const activeConversationRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!usuario?.id) return;
@@ -89,11 +90,16 @@ export function ChatNotificationToast() {
     const handleModeChange = (e: Event) => {
       notifModeRef.current = (e as CustomEvent).detail as ChatNotifMode;
     };
+    const handleActiveConv = (e: Event) => {
+      activeConversationRef.current = (e as CustomEvent).detail as string | null;
+    };
     window.addEventListener('chat-notif-mode-changed', handleModeChange);
+    window.addEventListener('chat-active-conversation', handleActiveConv);
 
     return () => {
       supabase.removeChannel(muteChannel);
       window.removeEventListener('chat-notif-mode-changed', handleModeChange);
+      window.removeEventListener('chat-active-conversation', handleActiveConv);
     };
   }, [usuario?.id]);
 
@@ -129,7 +135,7 @@ export function ChatNotificationToast() {
   const sendBrowserNotification = useCallback((title: string, body: string, conversationId: string, iconUrl?: string | null) => {
     if (!('Notification' in window)) return;
     if (Notification.permission !== 'granted') return;
-    if (document.hasFocus() && location.pathname === '/chat') return;
+    if (document.hasFocus() && location.pathname === '/chat' && activeConversationRef.current === conversationId) return;
 
     try {
       const notif = new Notification(title, {
@@ -251,8 +257,9 @@ export function ChatNotificationToast() {
               }
             }
 
-            // In-app toast (only when on chat page skip)
-            if (location.pathname !== '/chat') {
+            // In-app toast: skip only if actively viewing this conversation
+            const isViewingThisConv = location.pathname === '/chat' && activeConversationRef.current === convId;
+            if (!isViewingThisConv) {
               const notification: Notification = {
                 id: msg.id as string,
                 senderName: displayName,

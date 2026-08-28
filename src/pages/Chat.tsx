@@ -88,6 +88,13 @@ export function Chat() {
     }
   }, [location.state]);
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('chat-active-conversation', { detail: selectedConversationId }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('chat-active-conversation', { detail: null }));
+    };
+  }, [selectedConversationId]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
