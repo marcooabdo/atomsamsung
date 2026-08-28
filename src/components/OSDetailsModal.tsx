@@ -136,8 +136,10 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     if (!osDetails) return;
     setSavingTel2(true);
     const val = tel2Value.trim() || null;
-    await supabase.from('os').update({ cliente_telefone_2: val }).eq('id', osDetails.id);
-    setOsDetails({ ...osDetails, cliente_telefone_2: val });
+    const { data, error } = await supabase.from('os').update({ cliente_telefone_2: val }).eq('id', osDetails.id).select('cliente_telefone_2').single();
+    if (!error && data) {
+      setOsDetails({ ...osDetails, cliente_telefone_2: data.cliente_telefone_2 });
+    }
     setEditingTel2(false);
     setSavingTel2(false);
   };

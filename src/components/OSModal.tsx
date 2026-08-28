@@ -3824,8 +3824,10 @@ Não haverá cobrança ao cliente.`
                           onClick={async () => {
                             setSavingTel2(true);
                             const val = tel2Value.trim() || null;
-                            await supabase.from('os').update({ cliente_telefone_2: val }).eq('id', os.id);
-                            setOs({ ...os, cliente_telefone_2: val });
+                            const { data, error } = await supabase.from('os').update({ cliente_telefone_2: val }).eq('id', os.id).select('cliente_telefone_2').single();
+                            if (!error && data) {
+                              setOS({ ...os, cliente_telefone_2: data.cliente_telefone_2 });
+                            }
                             setEditingTel2(false);
                             setSavingTel2(false);
                           }}
