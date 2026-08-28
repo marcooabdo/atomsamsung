@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin, SmilePlus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ChatUserProfileModal } from './ChatUserProfileModal';
@@ -45,11 +45,14 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, userId, onEdit, onDelete, onPin, currentUserName }: ChatMessageProps) {
   const [showReads, setShowReads] = useState(false);
+  const [readByNames, setReadByNames] = useState<string[]>([]);
   const [showProfile, setShowProfile] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<'below' | 'above'>('below');
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const reactionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -110,6 +113,25 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
     });
 
     setReactions(Object.entries(grouped).map(([emoji, info]) => ({ emoji, ...info })));
+  };
+
+  const loadReadByNames = useCallback(async () => {
+    if (!message.read_by || message.read_by.length === 0) return;
+    const { data } = await supabase
+      .from('usuarios')
+      .select('nome')
+      .in('id', message.read_by);
+    if (data) {
+      setReadByNames(data.map(u => u.nome));
+    }
+  }, [message.read_by]);
+
+  const handleToggleReads = () => {
+    const next = !showReads;
+    setShowReads(next);
+    if (next && readByNames.length === 0) {
+      loadReadByNames();
+    }
   };
 
   const toggleReaction = async (emoji: string) => {
@@ -314,7 +336,15 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
                 <SmilePlus className="w-4 h-4 text-gray-400" />
               </button>
               <button
-                onClick={() => setShowMenu(!showMenu)}
+                ref={menuButtonRef}
+                onClick={() => {
+                  if (!showMenu && menuButtonRef.current) {
+                    const rect = menuButtonRef.current.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    setMenuPosition(spaceBelow < 180 ? 'above' : 'below');
+                  }
+                  setShowMenu(!showMenu);
+                }}
                 className="p-1 rounded-full hover:bg-white/10"
               >
                 <MoreVertical className="w-4 h-4 text-gray-400" />
@@ -343,7 +373,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
           {showMenu && (
             <div
               ref={menuRef}
-              className={`absolute ${isOwnMessage ? 'right-full mr-2' : 'left-full ml-2'} top-0 z-50 bg-[#1a2832] border border-[#00D4FF]/20 rounded-xl shadow-2xl overflow-hidden min-w-[140px]`}
+              className={`absolute ${isOwnMessage ? 'right-full mr-2' : 'left-full ml-2'} ${menuPosition === 'above' ? 'bottom-0' : 'top-0'} z-50 bg-[#1a2832] border border-[#00D4FF]/20 rounded-xl shadow-2xl overflow-hidden min-w-[140px]`}
               style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
             >
               {canPin && (
@@ -404,7 +434,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
                 <div className="flex items-center">
                   {conversationType === 'group' && isRead ? (
                     <button
-                      onClick={() => setShowReads(!showReads)}
+                      onClick={handleToggleReads}
                       className="hover:scale-110 transition-transform"
                     >
                       <CheckCheck className={`w-3.5 h-3.5 ${isRead ? 'text-[#00D4FF]' : 'text-gray-500'}`} />
@@ -417,6 +447,14 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
                     )
                   )}
                 </div>
+              )}
+              {!isOwnMessage && conversationType === 'group' && isRead && (
+                <button
+                  onClick={handleToggleReads}
+                  className="hover:scale-110 transition-transform"
+                >
+                  <Eye className="w-3 h-3 text-gray-500 hover:text-[#00D4FF]" />
+                </button>
               )}
             </div>
           </div>
@@ -446,8 +484,15 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
           <div className="mt-1 p-2 bg-black/60 rounded-lg border border-[#00D4FF]/20 text-xs">
             <div className="flex items-center gap-1 text-[#00D4FF] mb-1">
               <Eye className="w-3 h-3" />
-              <span className="font-semibold">Lido por {message.read_by.length}</span>
+              <span className="font-semibold">Visualizada por {message.read_by.length}</span>
             </div>
+            {readByNames.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {readByNames.map((name, i) => (
+                  <span key={i} className="px-1.5 py-0.5 bg-[#1a3a4a]/60 rounded text-gray-300">{name}</span>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
