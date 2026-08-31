@@ -46,6 +46,7 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
   const [error, setError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; sender_name: string; content: string | null; message_type: string } | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const messageListRef = useRef<ChatMessageListRef>(null);
   const dragCounterRef = useRef(0);
@@ -61,6 +62,7 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
     setLoading(true);
     setError(null);
     setEditingMessage(null);
+    setReplyingTo(null);
     loadConversationInfo();
     loadParticipants();
     markMessagesAsRead();
@@ -171,6 +173,18 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
 
   const handleEditMessage = (message: Message) => {
     setEditingMessage({ id: message.id, content: message.content || '' });
+    setReplyingTo(null);
+    chatInputRef.current?.focus();
+  };
+
+  const handleReplyMessage = (message: Message) => {
+    setReplyingTo({
+      id: message.id,
+      sender_name: message.sender_name,
+      content: message.content,
+      message_type: message.message_type
+    });
+    setEditingMessage(null);
     chatInputRef.current?.focus();
   };
 
@@ -362,6 +376,7 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
         onEditMessage={handleEditMessage}
         onDeleteMessage={handleDeleteMessage}
         onPinMessage={handlePinMessage}
+        onReplyMessage={handleReplyMessage}
         currentUserName={usuario?.nome}
       />
 
@@ -370,12 +385,14 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
         conversationId={conversationId}
         userId={userId}
         userName={usuario?.nome}
-        onMessageSent={markMessagesAsRead}
+        onMessageSent={() => { markMessagesAsRead(); setReplyingTo(null); }}
         onMessageAdded={(msg) => messageListRef.current?.addMessage(msg)}
         editingMessage={editingMessage}
         onCancelEdit={() => setEditingMessage(null)}
         onEditComplete={handleEditComplete}
         participants={participants}
+        replyingTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
       />
     </div>
   );

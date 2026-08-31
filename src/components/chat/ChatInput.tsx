@@ -1,6 +1,6 @@
 import { useState, useRef, KeyboardEvent, useEffect, DragEvent, ClipboardEvent, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Send, Paperclip, Image, FileText, X, Music, Pencil, Smile, Mic, Square } from 'lucide-react';
+import { Send, Paperclip, Image, FileText, X, Music, Pencil, Smile, Mic, Square, Reply } from 'lucide-react';
 import { Message } from './ChatMessageList';
 
 const EMOJI_LIST = [
@@ -34,6 +34,8 @@ interface ChatInputProps {
   onCancelEdit?: () => void;
   onEditComplete?: (messageId: string, newContent: string) => void;
   participants?: Participant[];
+  replyingTo?: { id: string; sender_name: string; content: string | null; message_type: string } | null;
+  onCancelReply?: () => void;
 }
 
 interface FilePreview {
@@ -49,7 +51,7 @@ export interface ChatInputRef {
 }
 
 export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
-  ({ conversationId, userId, userName, onMessageSent, onMessageAdded, editingMessage, onCancelEdit, onEditComplete, participants = [] }, ref) => {
+  ({ conversationId, userId, userName, onMessageSent, onMessageAdded, editingMessage, onCancelEdit, onEditComplete, participants = [], replyingTo, onCancelReply }, ref) => {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -382,6 +384,10 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         insertData.mentioned_user_ids = mentionedIds;
       }
 
+      if (replyingTo) {
+        insertData.reply_to_message_id = replyingTo.id;
+      }
+
       const { data, error } = await supabase
         .from('chat_messages')
         .insert(insertData)
@@ -701,6 +707,26 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             <span className="text-sm text-[#FFD700]">Editando mensagem</span>
           </div>
           <button onClick={() => { onCancelEdit?.(); setMessage(''); }} className="p-1 hover:bg-white/10 rounded">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+      )}
+
+      {replyingTo && !editingMessage && (
+        <div className="mb-3 px-4 py-2 bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <Reply className="w-4 h-4 text-[#00D4FF] flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#00D4FF] truncate">Respondendo a {replyingTo.sender_name}</p>
+              <p className="text-xs text-gray-400 truncate">
+                {replyingTo.message_type === 'image' ? '\ud83d\udcf7 Imagem' :
+                 replyingTo.message_type === 'document' ? '\ud83d\udcce Documento' :
+                 replyingTo.message_type === 'audio' ? '\ud83c\udfa4 \u00c1udio' :
+                 replyingTo.content || 'Mensagem'}
+              </p>
+            </div>
+          </div>
+          <button onClick={() => onCancelReply?.()} className="p-1 hover:bg-white/10 rounded flex-shrink-0">
             <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>

@@ -31,6 +31,7 @@ interface ChatMessageListProps {
   onEditMessage?: (message: Message) => void;
   onDeleteMessage?: (messageId: string) => void;
   onPinMessage?: (messageId: string) => void;
+  onReplyMessage?: (message: Message) => void;
   currentUserName?: string;
 }
 
@@ -39,7 +40,7 @@ export interface ChatMessageListRef {
   scrollToMessage: (messageId: string) => void;
 }
 
-export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType, onEditMessage, onDeleteMessage, onPinMessage, currentUserName }, ref) => {
+export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType, onEditMessage, onDeleteMessage, onPinMessage, onReplyMessage, currentUserName }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -50,6 +51,28 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [replyMap, setReplyMap] = useState<Record<string, { id: string; sender_name: string; content: string | null; message_type: string }>>({});
+
+  useEffect(() => {
+    const replyIds = messages
+      .map(m => m.reply_to_message_id)
+      .filter((id): id is string => id !== null && !replyMap[id]);
+    if (replyIds.length === 0) return;
+    const uniqueIds = [...new Set(replyIds)];
+    supabase
+      .from('chat_messages')
+      .select('id, content, message_type, sender_id, usuarios!chat_messages_sender_id_fkey(nome)')
+      .in('id', uniqueIds)
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, { id: string; sender_name: string; content: string | null; message_type: string }> = {};
+        data.forEach((m: any) => {
+          const sender = Array.isArray(m.usuarios) ? m.usuarios[0] : m.usuarios;
+          map[m.id] = { id: m.id, sender_name: sender?.nome || 'Usu\u00e1rio', content: m.content, message_type: m.message_type };
+        });
+        setReplyMap(prev => ({ ...prev, ...map }));
+      });
+  }, [messages]);
 
   useEffect(() => {
     loadHistoryLimit();
@@ -295,6 +318,15 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const scrollToMessageLocal = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-[#00D4FF]/50', 'rounded-xl');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-[#00D4FF]/50', 'rounded-xl'), 2000);
+    }
+  };
+
   const handleScroll = () => {
     if (!containerRef.current || loadingMore || !hasMore) return;
 
@@ -404,7 +436,10 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
                     onEdit={onEditMessage}
                     onDelete={onDeleteMessage}
                     onPin={onPinMessage}
+                    onReply={onReplyMessage}
                     currentUserName={currentUserName}
+                    replyTo={message.reply_to_message_id ? replyMap[message.reply_to_message_id] || null : null}
+                    onScrollToReply={scrollToMessageLocal}
                   />
                 </div>
               );

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin, SmilePlus } from 'lucide-react';
+import { Check, CheckCheck, Download, Eye, FileText, Mic, MoreVertical, Pencil, Trash2, Pin, SmilePlus, Reply } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ChatUserProfileModal } from './ChatUserProfileModal';
 
@@ -40,10 +40,13 @@ interface ChatMessageProps {
   onEdit?: (message: Message) => void;
   onDelete?: (messageId: string) => void;
   onPin?: (messageId: string) => void;
+  onReply?: (message: Message) => void;
   currentUserName?: string;
+  replyTo?: { id: string; sender_name: string; content: string | null; message_type: string } | null;
+  onScrollToReply?: (messageId: string) => void;
 }
 
-export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, userId, onEdit, onDelete, onPin, currentUserName }: ChatMessageProps) {
+export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, conversationType, userId, onEdit, onDelete, onPin, onReply, currentUserName, replyTo, onScrollToReply }: ChatMessageProps) {
   const [showReads, setShowReads] = useState(false);
   const [readByNames, setReadByNames] = useState<string[]>([]);
   const [showProfile, setShowProfile] = useState(false);
@@ -376,6 +379,15 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
               className={`absolute ${isOwnMessage ? 'right-full mr-2' : 'left-full ml-2'} ${menuPosition === 'above' ? 'bottom-0' : 'top-0'} z-50 bg-[#1a2832] border border-[#00D4FF]/20 rounded-xl shadow-2xl overflow-hidden min-w-[140px]`}
               style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
             >
+              {!isDeleted && (
+                <button
+                  onClick={() => { onReply?.(message); setShowMenu(false); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-200 hover:bg-[#00D4FF]/10 transition-colors"
+                >
+                  <Reply className="w-4 h-4 text-[#00D4FF]" />
+                  Responder
+                </button>
+              )}
               {canPin && (
                 <button
                   onClick={() => { onPin?.(message.id); setShowMenu(false); }}
@@ -418,6 +430,23 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
                 <Pin className="w-3 h-3 text-[#FFD700]" />
                 <span className="text-[10px] text-[#FFD700]">Fixada</span>
               </div>
+            )}
+
+            {replyTo && (
+              <button
+                onClick={() => onScrollToReply?.(replyTo.id)}
+                className="w-full mb-1.5 px-2.5 py-1.5 bg-black/30 border-l-2 border-[#00D4FF] rounded text-left hover:bg-black/40 transition-colors"
+              >
+                <p className="text-[11px] font-semibold text-[#00D4FF] truncate">
+                  {replyTo.sender_name}
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {replyTo.message_type === 'image' ? '\ud83d\udcf7 Imagem' :
+                   replyTo.message_type === 'document' ? '\ud83d\udcce Documento' :
+                   replyTo.message_type === 'audio' ? '\ud83c\udfa4 \u00c1udio' :
+                   replyTo.content || 'Mensagem'}
+                </p>
+              </button>
             )}
 
             {renderContent()}
