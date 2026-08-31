@@ -162,10 +162,11 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
 
   const markMessagesAsRead = async () => {
     try {
-      await supabase.rpc('mark_conversation_as_read', {
+      await supabase.rpc('mark_messages_as_read', {
         p_conversation_id: conversationId,
         p_user_id: userId
       });
+      window.dispatchEvent(new CustomEvent('chat:messages-read'));
     } catch (err) {
       // ignored
     }
