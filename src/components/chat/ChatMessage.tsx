@@ -435,12 +435,13 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
             {replyTo && (
               <button
                 onClick={() => onScrollToReply?.(replyTo.id)}
-                className="w-full mb-1.5 px-2.5 py-1.5 bg-black/30 border-l-2 border-[#00D4FF] rounded text-left hover:bg-black/40 transition-colors overflow-hidden max-w-full"
+                className="w-full mb-1.5 px-2.5 py-1.5 bg-black/30 border-l-2 border-[#00D4FF] rounded text-left hover:bg-black/40 transition-colors overflow-hidden"
+                style={{ maxWidth: '100%' }}
               >
-                <p className="text-[11px] font-semibold text-[#00D4FF] truncate">
+                <p className="text-[11px] font-semibold text-[#00D4FF] overflow-hidden whitespace-nowrap text-ellipsis">
                   {replyTo.sender_name}
                 </p>
-                <p className="text-xs text-gray-400 truncate">
+                <p className="text-xs text-gray-400 overflow-hidden display-[-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] line-clamp-2">
                   {replyTo.message_type === 'image' ? '\ud83d\udcf7 Imagem' :
                    replyTo.message_type === 'document' ? '\ud83d\udcce Documento' :
                    replyTo.message_type === 'audio' ? '\ud83c\udfa4 \u00c1udio' :
