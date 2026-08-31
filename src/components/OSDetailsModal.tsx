@@ -41,6 +41,7 @@ interface OSDetails {
   cliente_nome: string;
   cliente_telefone: string | null;
   cliente_telefone_2: string | null;
+  cliente_telefone_3: string | null;
   cliente_email: string | null;
   cliente_cep: string | null;
   cliente_logradouro: string | null;
@@ -131,6 +132,9 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [editingTel2, setEditingTel2] = useState(false);
   const [tel2Value, setTel2Value] = useState('');
   const [savingTel2, setSavingTel2] = useState(false);
+  const [editingTel3, setEditingTel3] = useState(false);
+  const [tel3Value, setTel3Value] = useState('');
+  const [savingTel3, setSavingTel3] = useState(false);
 
   const handleSaveTel2 = async () => {
     if (!osDetails) return;
@@ -142,6 +146,18 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     }
     setEditingTel2(false);
     setSavingTel2(false);
+  };
+
+  const handleSaveTel3 = async () => {
+    if (!osDetails) return;
+    setSavingTel3(true);
+    const val = tel3Value.trim() || null;
+    const { data, error } = await supabase.from('os').update({ cliente_telefone_3: val }).eq('id', osDetails.id).select('cliente_telefone_3').single();
+    if (!error && data) {
+      setOsDetails({ ...osDetails, cliente_telefone_3: data.cliente_telefone_3 });
+    }
+    setEditingTel3(false);
+    setSavingTel3(false);
   };
 
   const themeAccent = themeInfo.accent;
@@ -737,6 +753,48 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                           onClick={() => { setTel2Value(osDetails.cliente_telefone_2 || ''); setEditingTel2(true); }}
                           className="p-1 rounded hover:bg-white/10"
                           title="Editar Telefone 2"
+                        >
+                          <Pencil className="w-3.5 h-3.5" style={{ color: textSecondary }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span style={{ color: textSecondary }}>Telefone 3:</span>
+                    {editingTel3 ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={tel3Value}
+                          onChange={(e) => setTel3Value(e.target.value)}
+                          placeholder="(00) 00000-0000"
+                          className="flex-1 px-2 py-1 text-sm rounded border outline-none"
+                          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)', color: textPrimary }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleSaveTel3}
+                          disabled={savingTel3}
+                          className="p-1 rounded hover:bg-green-500/20 text-green-400"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingTel3(false)}
+                          className="p-1 rounded hover:bg-red-500/20 text-red-400"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium" style={{ color: textPrimary }}>
+                          {osDetails.cliente_telefone_3 || '-'}
+                        </p>
+                        <button
+                          onClick={() => { setTel3Value(osDetails.cliente_telefone_3 || ''); setEditingTel3(true); }}
+                          className="p-1 rounded hover:bg-white/10"
+                          title="Editar Telefone 3"
                         >
                           <Pencil className="w-3.5 h-3.5" style={{ color: textSecondary }} />
                         </button>

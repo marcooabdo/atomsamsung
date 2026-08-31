@@ -222,6 +222,9 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   const [editingTel2, setEditingTel2] = useState(false);
   const [tel2Value, setTel2Value] = useState('');
   const [savingTel2, setSavingTel2] = useState(false);
+  const [editingTel3, setEditingTel3] = useState(false);
+  const [tel3Value, setTel3Value] = useState('');
+  const [savingTel3, setSavingTel3] = useState(false);
   const [whatsAppError, setWhatsAppError] = useState<string | null>(null);
 
   // Estado para editar numero_os_samsung
@@ -269,6 +272,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     cliente_nome: '',
     cliente_telefone: '',
     cliente_telefone_2: '',
+    cliente_telefone_3: '',
     cliente_cpf_cnpj: '',
     equipamento: '',
     modelo: '',
@@ -3861,6 +3865,65 @@ Não haverá cobrança ao cliente.`
                           onClick={() => { setTel2Value(os.cliente_telefone_2 || ''); setEditingTel2(true); }}
                           className="p-1 rounded hover:bg-white/10"
                           title="Editar Telefone 2"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase">Telefone 3</label>
+                    {editingTel3 ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={tel3Value}
+                          onChange={(e) => setTel3Value(e.target.value)}
+                          placeholder="(00) 00000-0000"
+                          className="flex-1 px-2 py-1 text-sm rounded border border-gray-600 bg-gray-800 text-white outline-none focus:border-blue-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={async () => {
+                            setSavingTel3(true);
+                            const val = tel3Value.trim() || null;
+                            const { data, error } = await supabase.from('os').update({ cliente_telefone_3: val }).eq('id', os.id).select('cliente_telefone_3').single();
+                            if (!error && data) {
+                              setOS({ ...os, cliente_telefone_3: data.cliente_telefone_3 });
+                            }
+                            setEditingTel3(false);
+                            setSavingTel3(false);
+                          }}
+                          disabled={savingTel3}
+                          className="p-1 rounded hover:bg-green-500/20 text-green-400"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingTel3(false)}
+                          className="p-1 rounded hover:bg-red-500/20 text-red-400"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 mt-1">
+                        {os.cliente_telefone_3 ? (
+                          <button
+                            onClick={() => handlePhoneClick(os.cliente_telefone_3)}
+                            disabled={loadingWhatsApp}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-sm text-green-400 transition-colors disabled:opacity-50"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>{os.cliente_telefone_3}</span>
+                          </button>
+                        ) : (
+                          <p className="text-sm text-gray-300">-</p>
+                        )}
+                        <button
+                          onClick={() => { setTel3Value(os.cliente_telefone_3 || ''); setEditingTel3(true); }}
+                          className="p-1 rounded hover:bg-white/10"
+                          title="Editar Telefone 3"
                         >
                           <Pencil className="w-3.5 h-3.5 text-gray-400" />
                         </button>
