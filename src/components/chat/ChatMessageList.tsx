@@ -40,6 +40,21 @@ export interface ChatMessageListRef {
   scrollToMessage: (messageId: string) => void;
 }
 
+function formatDateDivider(date: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = today.getTime() - target.getTime();
+  const dayMs = 86400000;
+
+  if (diff < dayMs) return 'Hoje';
+  if (diff < dayMs * 2) return 'Ontem';
+  if (diff < dayMs * 7) {
+    return date.toLocaleDateString('pt-BR', { weekday: 'long' }).replace(/^\w/, c => c.toUpperCase());
+  }
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
 export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType, onEditMessage, onDeleteMessage, onPinMessage, onReplyMessage, currentUserName }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -416,16 +431,29 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         ) : (
           <div className="space-y-4">
             {messages.map((message, index) => {
+              const msgDate = new Date(message.created_at);
+              const prevDate = index > 0 ? new Date(messages[index - 1].created_at) : null;
+              const showDateDivider = !prevDate ||
+                msgDate.toDateString() !== prevDate.toDateString();
+
               const showSenderName = conversationType === 'group' &&
                 message.sender_id !== userId &&
                 (index === 0 || messages[index - 1].sender_id !== message.sender_id);
 
-              const isGrouped = index > 0 &&
+              const isGrouped = !showDateDivider && index > 0 &&
                 messages[index - 1].sender_id === message.sender_id &&
-                new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() < 60000;
+                msgDate.getTime() - prevDate!.getTime() < 60000;
 
               return (
                 <div key={message.id} id={`msg-${message.id}`} className="transition-all duration-300">
+                  {showDateDivider && (
+                    <div className="flex items-center justify-center my-4">
+                      <div className="px-4 py-1.5 rounded-full text-xs font-medium shadow-sm"
+                        style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(8px)' }}>
+                        {formatDateDivider(msgDate)}
+                      </div>
+                    </div>
+                  )}
                   <ChatMessage
                     message={message}
                     isOwnMessage={message.sender_id === userId}
