@@ -314,7 +314,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
         <div className="w-8"></div>
       )}
 
-      <div className={`relative max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+      <div className={`relative max-w-[70%] min-w-0 ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {showSenderName && (
           <button
             onClick={() => setShowProfile(true)}
@@ -419,7 +419,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
           )}
 
           <div
-            className={`rounded-2xl px-3 py-2 ${
+            className={`rounded-2xl px-3 py-2 overflow-hidden min-w-0 ${
               isOwnMessage
                 ? 'bg-[#0d2832] rounded-br-sm'
                 : 'bg-[#1a2832] rounded-bl-sm'
@@ -435,7 +435,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
             {replyTo && (
               <button
                 onClick={() => onScrollToReply?.(replyTo.id)}
-                className="w-full mb-1.5 px-2.5 py-1.5 bg-black/30 border-l-2 border-[#00D4FF] rounded text-left hover:bg-black/40 transition-colors"
+                className="w-full mb-1.5 px-2.5 py-1.5 bg-black/30 border-l-2 border-[#00D4FF] rounded text-left hover:bg-black/40 transition-colors overflow-hidden max-w-full"
               >
                 <p className="text-[11px] font-semibold text-[#00D4FF] truncate">
                   {replyTo.sender_name}
